@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CueFes（キューフェス）</title>
+<link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABy0lEQVR42u1Xz0rDMBhPMikpYxGc0KrgNgbbxHXgZScfwGfYbUdvexRv8+Ztb+BL7KKoBxUVFRx0WMEObVaGeAqEmKR/NukEP/goaZt8f/PLLzCHEAQZCgIZS+YOrKSZ1HKa3TAM25TSDv8eYzwAAADDMIYXl1cncdaCSXqgUa/1RaM6IYT0ohyJ5UDLaXZ93z8SoxUjlWUGYzy4vrk9TO2AGHWcqGTzHp+eVxM7wC8SFYlKyqXtd50TSJd2ZpwQ0ktjXDTaqNf6P37IIQRlWq2U/Wql7O/uNI5V/4j6uZFf55+8qtaRloBvOlXtAADgY2+N8uOvUbBVcANvYpnFght4qYGIGSeE9DIFoqhuz5+9YX48sczi3FDccppdHtVEYUbSGIuVgTAM27oJrLYFN/BkPbCww8gwjOFSHkaswyeWWVRFHHcHaDOgKgVfArRpvvCaphlRVqnXIiFDwaRop/umUhR1DOtK8GuUjCGgyAFkUMzrwhzgEVB6gnFIyGsUP0i0C1gWKKUdWSmidojICSilHZkTOQShlJC44/G5bVul2WzmTKfTA9u2Sq+edzoPIbm7f9j/W5RsKUjpUtDypBeTJPwR/l9Os3bgGyrmIUyYDD50AAAAAElFTkSuQmCC">
 <style>
   :root{
     --bg:#f6f6f9; --panel:#ffffff; --panel2:#f2f2f6; --border:#e2e2ea;
@@ -22,11 +23,9 @@
     padding:14px 24px;background:var(--panel);
     border-bottom:1px solid var(--border);flex-wrap:wrap;
   }
-  .brand{display:flex;align-items:center;gap:10px;}
-  .brand .mark{flex:0 0 auto;display:block;}
-  .brand .wordmark{display:flex;flex-direction:column;gap:1px;}
-  .brand .wordmark .name{font-size:19px;font-weight:800;letter-spacing:-0.01em;color:var(--text);line-height:1.1;}
-  .brand .wordmark .name b{color:var(--accent);}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .mark{flex:0 0 auto;display:block;height:34px;width:auto;}
+  .brand .wordmark{display:flex;flex-direction:column;gap:1px;padding-top:2px;}
   .brand .wordmark .tagline{color:var(--muted);font-size:11.5px;letter-spacing:.01em;}
   .storage-note{padding:7px 24px;background:var(--panel2);color:var(--muted);font-size:11.5px;border-bottom:1px solid var(--border);}
   nav.tabs{display:flex;gap:2px;padding:0 24px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--border);}
@@ -170,17 +169,8 @@
 
 <header class="appbar">
   <div class="brand">
-    <svg class="mark" width="34" height="34" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <rect width="32" height="32" rx="9" fill="#B3185A"/>
-      <line x1="10" y1="23" x2="10" y2="10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
-      <circle cx="10" cy="10" r="2.4" fill="#fff"/>
-      <line x1="16" y1="23" x2="16" y2="14" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".62"/>
-      <circle cx="16" cy="14" r="2.4" fill="#fff" opacity=".62"/>
-      <line x1="22" y1="23" x2="22" y2="17" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".34"/>
-      <circle cx="22" cy="17" r="2.4" fill="#fff" opacity=".34"/>
-    </svg>
+    <img class="mark" id="hdrTitle" alt="CueFes" height="34" src="data:image/png;base64,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">
     <div class="wordmark">
-      <div class="name" id="hdrTitle"><b>Cue</b>Fes</div>
       <div class="tagline">サーキット＆特典会 タイムテーブル管理</div>
     </div>
   </div>
