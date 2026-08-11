@@ -284,7 +284,8 @@
       <p class="helptext">
         出演者一覧をまとめて取り込めます。下のテキスト欄に<b>Twitter(X)の告知文やLINEでもらったテキストなどをそのまま貼り付けて</b>「候補を抽出」を押すだけでOKです（画像は使いません）。<br>
         手元にあるのが画像だけの場合は、下の画像アップロード欄からOCR（文字認識）でテキスト化することもできます。<br>
-        認識のコツ：「10:30-11:00 グループ名」のように<b>1行に時刻＋アーティスト名</b>が入っている形式が最も正確です。「Aステージ」のような行を挟むと、それ以降の行に自動でステージ名が割り当てられます。
+        認識のコツ：「10:30-11:00 グループ名」のように<b>1行に時刻＋アーティスト名</b>が入っている形式が最も正確です。「Aステージ」のような行を挟むと、それ以降の行に自動でステージ名が割り当てられます。<br>
+        「13:40~14:00(20)」のように時刻の後ろに<b>尺（分）が括弧書きされている場合</b>は自動で無視されます。また「時刻＋尺」の行の次にアーティスト名だけの行が続く2行形式にも対応しています。
       </p>
 
       <div style="margin-top:4px;">
@@ -860,26 +861,51 @@
   // Heuristic: lines containing "HH:MM-HH:MM" are treated as a performance slot.
   // The remaining text on that line is the artist name. A preceding short line
   // containing "ステージ"/"STAGE"/"会場"/"AREA" is treated as the current lane name.
+  // A trailing duration annotation like "(20)" or "(20分)" right after the time
+  // range is stripped and ignored (it is not part of the artist name). If, after
+  // removing the time range and duration, nothing is left on that line, the very
+  // next line is treated as the artist name — this covers the common OCR layout
+  // where the time+duration sits on one line and the artist name sits on the
+  // line directly below it (e.g. "13:40~14:00(20)" then "ネオハレーション").
   function parseOcrText(text){
     const lines = (text||"").split(/\n/).map(l=>l.trim()).filter(l=>l.length>0);
     const timeRe = /(\d{1,2})\s*[:：]\s*(\d{2})\s*[〜~\-–—ー]{1,2}\s*(\d{1,2})\s*[:：]\s*(\d{2})/;
     const laneRe = /(ステージ|STAGE|Stage|会場|エリア|AREA|Area)/;
+    const durationInlineRe = /[\(（]\s*\d{1,3}\s*(?:分|min|m)?\s*[\)）]/gi;
+    const trimChars = /^[\s\-–—ー:：|／\/、,・•●○◎①②③④⑤⑥⑦⑧⑨⑩\[\]【】()（）]+|[\s\-–—ー:：|／\/、,・•●○◎\[\]【】()（）]+$/g;
     const pad2 = n => String(n).padStart(2,"0");
     let currentLane = "";
     const rows = [];
-    lines.forEach(line=>{
+    const consumed = new Set();
+    for(let i=0;i<lines.length;i++){
+      if(consumed.has(i)) continue;
+      const line = lines[i];
       const m = line.match(timeRe);
       if(m){
         const start = pad2(parseInt(m[1],10))+":"+m[2];
         const end = pad2(parseInt(m[3],10))+":"+m[4];
-        let name = line.replace(m[0],"").trim();
-        const trimChars = /^[\s\-–—ー:：|／\/、,・•●○◎①②③④⑤⑥⑦⑧⑨⑩\[\]【】()（）]+|[\s\-–—ー:：|／\/、,・•●○◎\[\]【】()（）]+$/g;
+        let name = line.replace(m[0],"");
+        name = name.replace(durationInlineRe,"");
         name = name.replace(trimChars,"").trim();
-        rows.push({ lane: currentLane, name, start, end, raw: line });
+        let raw = line;
+        if(!name){
+          const next = lines[i+1];
+          const nextIsTime = next!==undefined && timeRe.test(next);
+          const nextIsLane = next!==undefined && laneRe.test(next) && next.length<=20;
+          if(next!==undefined && !nextIsTime && !nextIsLane){
+            const candidateName = next.replace(durationInlineRe,"").replace(trimChars,"").trim();
+            if(candidateName){
+              name = candidateName;
+              raw = line+" / "+next;
+              consumed.add(i+1);
+            }
+          }
+        }
+        rows.push({ lane: currentLane, name, start, end, raw });
       } else if(laneRe.test(line) && line.length<=20){
         currentLane = line.replace(/[【】\[\]()（）]/g,"").trim();
       }
-    });
+    }
     return rows;
   }
 
