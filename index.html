@@ -3,52 +3,72 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>アイドルフェス タイムテーブル作成アプリ</title>
+<title>CueFes（キューフェス）</title>
 <style>
   :root{
-    --bg:#f4f5f9; --panel:#ffffff; --panel2:#eef0f5; --border:#dde0e9;
-    --text:#22222e; --muted:#666a7d; --accent:#e6316f; --accent2:#0f7fa3;
-    --danger:#d7263d; --ok:#1f8a4c; --warn:#b8720c;
-    font-family: "Hiragino Kaku Gothic ProN","Yu Gothic",-apple-system,BlinkMacSystemFont,sans-serif;
+    --bg:#f6f6f9; --panel:#ffffff; --panel2:#f2f2f6; --border:#e2e2ea;
+    --text:#1b1b22; --muted:#6c6c78; --accent:#b3185a; --accent-ink:#8f1149; --accent-soft:#b3185a12;
+    --accent2:#0e6d8c; --accent2-soft:#0e6d8c12;
+    --danger:#c81e39; --ok:#1c7a45; --warn:#a6650a;
+    --shadow-sm:0 1px 2px rgba(20,20,30,.05);
+    --shadow-md:0 4px 14px rgba(20,20,30,.08);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic Medium","Yu Gothic","Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
   }
   *{box-sizing:border-box;}
   body{margin:0;background:var(--bg);color:var(--text);}
   header.appbar{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:14px 20px;background:linear-gradient(90deg,#fff0f6,#eaf7fc);
-    border-bottom:2px solid var(--accent);flex-wrap:wrap;gap:10px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:14px 24px;background:var(--panel);
+    border-bottom:1px solid var(--border);flex-wrap:wrap;
   }
-  header.appbar h1{font-size:18px;margin:0;}
-  header.appbar .sub{color:var(--muted);font-size:12px;}
-  nav.tabs{display:flex;gap:4px;padding:10px 20px 0;flex-wrap:wrap;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand .mark{flex:0 0 auto;display:block;}
+  .brand .wordmark{display:flex;flex-direction:column;gap:1px;}
+  .brand .wordmark .name{font-size:19px;font-weight:800;letter-spacing:-0.01em;color:var(--text);line-height:1.1;}
+  .brand .wordmark .name b{color:var(--accent);}
+  .brand .wordmark .tagline{color:var(--muted);font-size:11.5px;letter-spacing:.01em;}
+  .storage-note{padding:7px 24px;background:var(--panel2);color:var(--muted);font-size:11.5px;border-bottom:1px solid var(--border);}
+  nav.tabs{display:flex;gap:2px;padding:0 24px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--border);}
   nav.tabs button{
-    background:var(--panel);color:var(--muted);border:1px solid var(--border);
-    border-bottom:none;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;
+    background:transparent;color:var(--muted);border:none;border-bottom:2px solid transparent;
+    padding:11px 14px;cursor:pointer;font-size:13px;font-weight:600;letter-spacing:.01em;
+    transition:color .12s ease,border-color .12s ease;
   }
-  nav.tabs button.active{background:var(--panel2);color:var(--text);border-color:var(--accent);font-weight:bold;}
-  nav.tabs button.clock-tab{margin-left:auto;border-color:var(--accent2);color:var(--accent2);}
-  nav.tabs button.clock-tab.active{border-color:var(--accent2);color:var(--text);}
-  main{padding:18px 20px 60px;max-width:1400px;margin:0 auto;}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:16px;}
-  .card h2{margin:0 0 12px;font-size:15px;color:var(--accent2);}
-  .grid{display:grid;gap:10px;}
+  nav.tabs button:hover{color:var(--text);}
+  nav.tabs button.active{color:var(--accent);border-bottom-color:var(--accent);}
+  nav.tabs button.clock-tab{margin-left:auto;color:var(--accent2);}
+  nav.tabs button.clock-tab.active{color:var(--accent2);border-bottom-color:var(--accent2);}
+  main{padding:20px 24px 64px;max-width:1400px;margin:0 auto;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+  .card h2{margin:0 0 14px;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;}
+  .card h2::before{content:"";width:5px;height:14px;border-radius:2px;background:var(--accent2);display:inline-block;}
+  .grid{display:grid;gap:12px;}
   .grid.cols4{grid-template-columns:repeat(4,1fr);}
   .grid.cols3{grid-template-columns:repeat(3,1fr);}
   .grid.cols2{grid-template-columns:repeat(2,1fr);}
-  label{display:block;font-size:11px;color:var(--muted);margin-bottom:3px;}
+  label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;letter-spacing:.01em;}
   input[type=text],input[type=time],input[type=date],select,textarea{
     width:100%;background:var(--panel2);border:1px solid var(--border);color:var(--text);
-    padding:7px 8px;border-radius:6px;font-size:13px;
+    padding:7px 9px;border-radius:7px;font-size:13px;font-family:inherit;
+    transition:border-color .12s ease,background .12s ease;
+  }
+  input[type=text]:focus,input[type=time]:focus,input[type=date]:focus,select:focus,textarea:focus{
+    outline:none;border-color:var(--accent2);background:var(--panel);
   }
   input[type=file]{color:var(--muted);font-size:12px;}
   button.btn{
-    background:var(--accent);color:#fff;border:none;padding:8px 14px;border-radius:6px;
-    cursor:pointer;font-size:13px;font-weight:bold;
+    background:var(--accent);color:#fff;border:1px solid var(--accent);padding:8px 15px;border-radius:8px;
+    cursor:pointer;font-size:13px;font-weight:700;letter-spacing:.01em;
+    transition:background .12s ease,border-color .12s ease,opacity .12s ease;
   }
-  button.btn.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  button.btn:hover{background:var(--accent-ink);border-color:var(--accent-ink);}
+  button.btn.secondary{background:var(--panel);color:var(--text);border:1px solid var(--border);}
+  button.btn.secondary:hover{background:var(--panel2);}
   button.btn.ghost{background:transparent;color:var(--accent2);border:1px solid var(--accent2);}
+  button.btn.ghost:hover{background:var(--accent2-soft);}
   button.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
-  button.btn:hover{filter:brightness(1.1);}
+  button.btn.danger:hover{background:#c81e3912;}
   button.btn:disabled{opacity:.4;cursor:not-allowed;}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
   .chip-list{display:flex;flex-wrap:wrap;gap:8px;}
@@ -59,33 +79,37 @@
   .chip input{width:110px;padding:3px 6px;font-size:12px;}
   .chip button{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 6px;}
   table.data{width:100%;border-collapse:collapse;font-size:12px;}
-  table.data th,table.data td{border:1px solid var(--border);padding:6px;text-align:left;vertical-align:middle;}
-  table.data th{background:var(--panel2);color:var(--muted);font-weight:normal;font-size:11px;}
+  table.data th,table.data td{border:1px solid var(--border);padding:7px;text-align:left;vertical-align:middle;}
+  table.data th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:11px;}
   table.data input,table.data select{font-size:12px;padding:4px 5px;}
   table.data td.color-cell{width:30px;}
   .swatch{width:20px;height:20px;border-radius:5px;border:1px solid #0003;cursor:pointer;}
   .del-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;}
   .warn-banner{
-    background:#fdecec;border:1px solid var(--danger);color:#9c1c2e;
-    padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;line-height:1.6;
+    background:#fdecec;border:1px solid var(--danger);color:#8f1327;
+    padding:10px 14px;border-radius:9px;margin-bottom:14px;font-size:13px;line-height:1.6;
   }
   .ok-banner{
-    background:#e9f7ef;border:1px solid var(--ok);color:#166534;
-    padding:8px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;
+    background:#e8f6ee;border:1px solid var(--ok);color:#155a35;
+    padding:8px 14px;border-radius:9px;margin-bottom:14px;font-size:13px;
   }
   .buffer-banner{
-    background:#fff5e5;border:1px solid var(--warn);color:#8a5600;
-    padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;line-height:1.6;
+    background:#fdf3e2;border:1px solid var(--warn);color:#7a4d08;
+    padding:10px 14px;border-radius:9px;margin-bottom:14px;font-size:13px;line-height:1.6;
   }
   .durfield{display:inline-flex;align-items:center;gap:4px;}
   .durfield input[type=number]{width:64px;}
   .durfield span{font-size:11px;color:var(--muted);white-space:nowrap;}
-  .daycard{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;}
+  .daycard{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:13px;}
   .timefield{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;}
   .timefield input[type=time]{width:auto;min-width:108px;}
   .timefield-late{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--muted);white-space:nowrap;cursor:pointer;margin:0;}
   .timefield-late input[type=checkbox]{width:auto;margin:0;}
-  .helptext{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6;}
+  .helptext{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.65;}
+  .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:middle;}
+  .status-dot.live{background:var(--danger);}
+  .status-dot.upcoming{background:var(--warn);}
+  .status-dot.done{background:var(--muted);}
   .tabcontent{display:none;}
   .tabcontent.active{display:block;}
   #print-area{display:none;}
@@ -104,8 +128,8 @@
   .gantt-v .lane .lane-track{position:relative;background-image:repeating-linear-gradient(0deg,transparent,transparent 29px,#00000012 29px,#00000012 30px);}
   .gantt-v .lane .lane-track.drag-hover{background-color:#0f7fa31a;outline:2px dashed var(--accent2);outline-offset:-2px;}
   .gantt-v .block{
-    position:absolute;left:5px;right:5px;border-radius:6px;padding:4px 6px;overflow:hidden;
-    color:#111;font-size:11px;line-height:1.25;box-shadow:0 1px 3px #0006;
+    position:absolute;left:5px;right:5px;border-radius:7px;padding:4px 6px;overflow:hidden;
+    color:#111;font-size:11px;line-height:1.25;box-shadow:0 1px 3px rgba(0,0,0,.22);
     cursor:grab;touch-action:none;user-select:none;
   }
   .gantt-v .block:active{cursor:grabbing;}
@@ -145,19 +169,32 @@
 <body>
 
 <header class="appbar">
-  <div>
-    <h1 id="hdrTitle">🎤 アイドルフェス タイムテーブル作成アプリ</h1>
-    <div class="sub">複数DAY対応／データはこのブラウザ内に自動保存されます（他の端末とは共有されません）</div>
+  <div class="brand">
+    <svg class="mark" width="34" height="34" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect width="32" height="32" rx="9" fill="#B3185A"/>
+      <line x1="10" y1="23" x2="10" y2="10" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/>
+      <circle cx="10" cy="10" r="2.4" fill="#fff"/>
+      <line x1="16" y1="23" x2="16" y2="14" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".62"/>
+      <circle cx="16" cy="14" r="2.4" fill="#fff" opacity=".62"/>
+      <line x1="22" y1="23" x2="22" y2="17" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".34"/>
+      <circle cx="22" cy="17" r="2.4" fill="#fff" opacity=".34"/>
+    </svg>
+    <div class="wordmark">
+      <div class="name" id="hdrTitle"><b>Cue</b>Fes</div>
+      <div class="tagline">サーキット＆特典会 タイムテーブル管理</div>
+    </div>
   </div>
   <div class="row">
-    <button class="btn secondary" id="btnBackupExport">💾 バックアップ保存(JSON)</button>
+    <button class="btn secondary" id="btnBackupExport">バックアップ保存(JSON)</button>
     <label class="btn secondary" style="cursor:pointer;">
-      📂 バックアップ読込
+      バックアップ読込
       <input type="file" id="fileBackupImport" accept=".json" style="display:none;">
     </label>
-    <button class="btn danger" id="btnResetAll">🗑 全データ削除</button>
+    <button class="btn danger" id="btnResetAll">全データ削除</button>
   </div>
 </header>
+
+<div class="storage-note">複数DAY対応／データはこのブラウザ内に自動保存されます（他の端末とは共有されません）</div>
 
 <nav class="tabs">
   <button data-tab="settings" class="active">① 基本設定</button>
@@ -167,7 +204,7 @@
   <button data-tab="tokuten">⑤ 特典会TT</button>
   <button data-tab="output">⑥ PDF出力</button>
   <button data-tab="stats">⑦ 実績集計</button>
-  <button data-tab="clock" class="clock-tab">⏰ 現在時刻</button>
+  <button data-tab="clock" class="clock-tab">現在時刻</button>
 </nav>
 
 <main>
@@ -233,11 +270,11 @@
       </div>
       <div class="row">
         <label class="btn secondary" style="cursor:pointer;">
-          📥 CSVを読み込む
+          CSVを読み込む
           <input type="file" id="fileCsvImport" accept=".csv" style="display:none;">
         </label>
-        <button class="btn secondary" id="btnCsvExport">📤 現在のデータをCSV出力</button>
-        <button class="btn ghost" id="btnCsvTemplate">📄 空のテンプレートCSVをダウンロード</button>
+        <button class="btn secondary" id="btnCsvExport">現在のデータをCSV出力</button>
+        <button class="btn ghost" id="btnCsvTemplate">空のテンプレートCSVをダウンロード</button>
       </div>
       <div class="helptext">
         CSVの列: <b>DAY, アーティスト名, ステージ, ライブ開始, ライブ終了, 尺(分), 転換(分), 特典会場, 特典会開始, 特典会終了, メモ, 動員数, チケット売上, イベンター好感度</b><br>
@@ -277,7 +314,7 @@
           </p>
           <div class="row">
             <input type="file" id="ocrFileInput" accept="image/*" style="width:auto;">
-            <button class="btn secondary" id="btnOcrRun" disabled>🔍 画像を解析してテキスト抽出</button>
+            <button class="btn secondary" id="btnOcrRun" disabled>画像を解析してテキスト抽出</button>
           </div>
           <div class="row" style="margin-top:8px;">
             <label style="width:auto;">読み取りレイアウト</label>
@@ -405,7 +442,7 @@
         下のボタンを押すと印刷ダイアログが開きます。印刷先を「PDFに保存」にすると、そのままPDFファイルとして出力できます（A4縦向き）。<br>
         時間軸を縦（上→下）、ステージ／特典会場を横並びの列にしたレイアウトで、DAYごと・種別ごとに1ページずつ出力されます。開催時間が長い場合は自動で文字を縮小して1ページに収めようとしますが、収まらない場合は続きのページに続きます。
       </p>
-      <button class="btn" id="btnPrint" style="font-size:15px;padding:12px 22px;">🖨 タイムテーブルPDFを出力する</button>
+      <button class="btn" id="btnPrint" style="font-size:15px;padding:12px 22px;">タイムテーブルPDFを出力する</button>
     </div>
   </div>
 
@@ -417,7 +454,7 @@
   <!-- ============ TAB: LIVE CLOCK ============ -->
   <div class="tabcontent" id="tab-clock">
     <div class="card" style="text-align:center;">
-      <h2>⏰ 現在時刻</h2>
+      <h2 style="justify-content:center;">現在時刻</h2>
       <div id="clockBig" style="font-size:56px;font-weight:bold;letter-spacing:2px;margin:10px 0;font-variant-numeric:tabular-nums;">--:--:--</div>
       <div id="clockDate" class="helptext" style="font-size:14px;"></div>
     </div>
@@ -814,7 +851,7 @@
       worker = await getOcrWorker();
     }catch(e){
       ocrWorkerPromise = null;
-      statusEl.textContent = "⚠ OCRエンジンの読み込みに失敗しました。インターネット接続を確認してください。";
+      statusEl.textContent = "OCRエンジンの読み込みに失敗しました。インターネット接続を確認してください。";
       return;
     }
     const psm = document.getElementById("ocrPsmSelect").value || "4"; // 4 = 1列として読み取る（SINGLE_COLUMN）
@@ -826,7 +863,7 @@
       statusEl.textContent = "✓ 解析完了。テキストを確認・修正してから「候補を抽出」を押してください。";
     }catch(e){
       console.error(e);
-      statusEl.textContent = "⚠ 解析に失敗しました: "+e.message;
+      statusEl.textContent = "解析に失敗しました: "+e.message;
     }
   }
 
@@ -1151,11 +1188,11 @@
     let bannerHtml = "";
     if(totalConflicts.size>0){
       const names = state.artists.filter(a=>totalConflicts.has(a.id)).map(a=>a.name).join("、");
-      bannerHtml += `<div class="warn-banner">⚠ 時間が重複しているアーティストがいます: ${escapeHtml(names)}</div>`;
+      bannerHtml += `<div class="warn-banner">注意：時間が重複しているアーティストがいます: ${escapeHtml(names)}</div>`;
     }
     if(bufferWarnings.size>0){
       const names = state.artists.filter(a=>bufferWarnings.has(a.id)).map(a=>a.name).join("、");
-      bannerHtml += `<div class="buffer-banner">⏱ 転換/バッファ時間が不足しているアーティストがいます: ${escapeHtml(names)}</div>`;
+      bannerHtml += `<div class="buffer-banner">注意：転換/バッファ時間が不足しているアーティストがいます: ${escapeHtml(names)}</div>`;
     }
     banner.innerHTML = bannerHtml;
   }
@@ -1421,12 +1458,12 @@
     const label = kind==="live" ? "ライブタイムテーブル" : "特典会タイムテーブル";
     const laneWord = kind==="live" ? "ステージ" : "特典会場";
     let statusHtml = conflicts.size>0
-      ? `<div class="warn-banner">⚠ 同一${laneWord}で時間が重複しています: ${escapeHtml(state.artists.filter(a=>conflicts.has(a.id)).map(a=>a.name).join("、"))}</div>`
+      ? `<div class="warn-banner">注意：同一${laneWord}で時間が重複しています: ${escapeHtml(state.artists.filter(a=>conflicts.has(a.id)).map(a=>a.name).join("、"))}</div>`
       : `<div class="ok-banner">✓ ${laneWord}内の時間重複はありません</div>`;
     if(kind==="live"){
       const bufWarn = detectBufferWarnings(day.id);
       if(bufWarn.size>0){
-        statusHtml += `<div class="buffer-banner">⏱ 転換/バッファ時間が不足している枠があります: ${escapeHtml(state.artists.filter(a=>bufWarn.has(a.id)).map(a=>a.name).join("、"))}</div>`;
+        statusHtml += `<div class="buffer-banner">注意：転換/バッファ時間が不足している枠があります: ${escapeHtml(state.artists.filter(a=>bufWarn.has(a.id)).map(a=>a.name).join("、"))}</div>`;
       }
     }
     const sub = day.date ? (" ・ "+day.date) : "";
@@ -1592,7 +1629,7 @@
     renderStatsTab();
     renderArtistNameList();
     updateClock();
-    document.title = (state.event.name?state.event.name+" - ":"")+"タイムテーブル作成アプリ";
+    document.title = (state.event.name?state.event.name+" - ":"")+"CueFes";
   }
 
   // Autocomplete suggestions (shared <datalist>) for every 「アーティスト名」input:
@@ -1648,9 +1685,9 @@
       const tokSt = computeTimeStatus(timeToMin(d.tokutenStart), timeToMin(d.tokutenEnd), nowMin);
       const badge = (label, st) => {
         if(!st) return `<div class="helptext">${label}：時刻未設定</div>`;
-        if(st.state==="during") return `<div class="ok-banner">🔴 ${label}：時間内（終了まで あと${fmtRemain(st.remain)}）</div>`;
-        if(st.state==="before") return `<div class="helptext">⏳ ${label}：開始まで あと${fmtRemain(st.remain)}</div>`;
-        return `<div class="helptext">✓ ${label}：終了しました</div>`;
+        if(st.state==="during") return `<div class="ok-banner"><span class="status-dot live"></span>${label}：時間内（終了まで あと${fmtRemain(st.remain)}）</div>`;
+        if(st.state==="before") return `<div class="helptext"><span class="status-dot upcoming"></span>${label}：開始まで あと${fmtRemain(st.remain)}</div>`;
+        return `<div class="helptext"><span class="status-dot done"></span>${label}：終了しました</div>`;
       };
       card.innerHTML = `<h2>本日は ${escapeHtml(d.label)} です</h2>` + badge("ライブ", liveSt) + badge("特典会", tokSt);
       wrap.appendChild(card);
