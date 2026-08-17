@@ -112,6 +112,11 @@
   .tabcontent{display:none;}
   .tabcontent.active{display:block;}
   #print-area{display:none;}
+  .modal-overlay{position:fixed;inset:0;background:rgba(20,20,30,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .modal-box{background:var(--panel);border-radius:12px;padding:22px 24px;max-width:340px;width:100%;box-shadow:var(--shadow-md);}
+  .modal-box h3{margin:0 0 10px;font-size:15px;}
+  .modal-box .helptext{margin-top:2px;}
+  .modal-box input{margin-top:10px;}
 
   /* ---- Vertical Gantt (time flows top -> bottom, columns = stages/venues) ---- */
   .gantt-v-wrap{overflow-x:auto;}
@@ -175,6 +180,7 @@
     </div>
   </div>
   <div class="row">
+    <button class="btn secondary" id="btnAdminToggle">管理者ログイン</button>
     <button class="btn secondary" id="btnBackupExport">バックアップ保存(JSON)</button>
     <label class="btn secondary" style="cursor:pointer;">
       バックアップ読込
@@ -183,6 +189,19 @@
     <button class="btn danger" id="btnResetAll">全データ削除</button>
   </div>
 </header>
+
+<div class="modal-overlay" id="adminModal">
+  <div class="modal-box">
+    <h3>管理者ログイン</h3>
+    <p class="helptext">動員数・チケット売上・イベンター好感度を表示するには、① 基本設定タブで設定した管理者PINを入力してください。</p>
+    <input type="password" id="adminPinInput" placeholder="PIN">
+    <div class="helptext" id="adminPinError" style="display:none;color:var(--danger);">PINが正しくありません。</div>
+    <div class="row" style="margin-top:14px;justify-content:flex-end;">
+      <button class="btn secondary" id="adminModalCancel">キャンセル</button>
+      <button class="btn" id="adminModalSubmit">ログイン</button>
+    </div>
+  </div>
+</div>
 
 <div class="storage-note">複数DAY対応／データはこのブラウザ内に自動保存されます（他の端末とは共有されません）</div>
 
@@ -193,7 +212,7 @@
   <button data-tab="live">④ ライブTT</button>
   <button data-tab="tokuten">⑤ 特典会TT</button>
   <button data-tab="output">⑥ PDF出力</button>
-  <button data-tab="stats">⑦ 実績集計</button>
+  <button data-tab="stats" class="admin-field">⑦ 実績集計</button>
   <button data-tab="clock" class="clock-tab">現在時刻</button>
 </nav>
 
@@ -207,6 +226,14 @@
         <div><label>イベント名</label><input type="text" id="evName" placeholder="〇〇アイドルフェスティバル"></div>
         <div><label>会場</label><input type="text" id="evVenue" placeholder="〇〇ホール"></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>管理者設定</h2>
+      <div class="grid cols2">
+        <div><label>管理者PIN</label><input type="text" id="evAdminPin" placeholder="例：1234（空欄なら保護なし）"></div>
+      </div>
+      <div class="helptext">設定すると、動員数・チケット売上・イベンター好感度（「⑦実績集計」タブを含む）は、このPINでログインしないと閲覧・編集できなくなります。ヘッダーの「管理者ログイン」からログインしてください。タブを閉じる・再読み込みするとログイン状態は自動的にリセットされます。空欄のままだと保護は無効です（このアプリはブラウザ内で完結するため、簡易的な閲覧制限であり厳密なセキュリティ機能ではありません）。</div>
     </div>
 
     <div class="card">
@@ -274,6 +301,7 @@
         ・転換(分)は次の枠までに必要な機材転換・バッファ時間です。空欄で問題ありません。<br>
         ・特典会に参加しない場合は特典会関連の列を空欄にしてください。<br>
         ・動員数（人数）、チケット売上（円）、イベンター好感度（1〜5の数字）は主催者の内部集計用の項目です。空欄で問題ありません。「⑦実績集計」タブで自動集計されます（配布用PDFには出力されません）。<br>
+        ・動員数／チケット売上／イベンター好感度は管理者専用の項目です。基本設定で管理者PINを設定している場合、ログインしていない状態ではCSV出力にこれらの列は含まれず、取り込み時もこれらの列は無視されます（他の項目は通常どおり取り込まれます）。<br>
         ・「更新＋追加」モードなら、出演者が決まるたびにCSVに1行ずつ追記して読み込み直すだけでOK。同じDAY・同じアーティスト名の行は上書き更新され、新しい名前の行だけが追加されます（同名重複が発生しません）。<br>
         ・「常に新規追加のみ」モードは、取り込むたびに必ず新しい行として追加されます（同名でも別データとして扱いたい場合向け）。
       </div>
@@ -361,9 +389,9 @@
         <div><label>特典会終了</label><span class="timefield"><input type="time" step="300" data-role="afTokutenEnd"><label class="timefield-late"><input type="checkbox" data-role="afTokutenEnd_late">翌日</label></span></div>
         <div><label>尺（分）</label><span class="durfield"><input type="number" id="afDuration" min="0" step="5" placeholder="20"><span>分→終了を自動計算</span></span></div>
         <div><label>転換/バッファ（分）</label><span class="durfield"><input type="number" id="afChangeover" min="0" step="5" placeholder="5"><span>分（次の枠まで）</span></span></div>
-        <div><label>動員数</label><input type="number" id="afAudience" min="0" step="1" placeholder="人数"></div>
-        <div><label>チケット売上（円）</label><input type="number" id="afTicketSales" min="0" step="100" placeholder="円"></div>
-        <div><label>イベンター好感度</label>
+        <div class="admin-field"><label>動員数</label><input type="number" id="afAudience" min="0" step="1" placeholder="人数"></div>
+        <div class="admin-field"><label>チケット売上（円）</label><input type="number" id="afTicketSales" min="0" step="100" placeholder="円"></div>
+        <div class="admin-field"><label>イベンター好感度</label>
           <select id="afFavorability">
             <option value="">（未評価）</option>
             <option value="1">★☆☆☆☆</option>
@@ -373,9 +401,9 @@
             <option value="5">★★★★★</option>
           </select>
         </div>
-        <div></div>
-        <div></div>
-        <div></div>
+        <div class="admin-field"></div>
+        <div class="admin-field"></div>
+        <div class="admin-field"></div>
         <div style="grid-column:span 4;"><label>メモ</label><input type="text" id="afMemo"></div>
       </div>
       <div class="row" style="margin-top:10px;">
@@ -393,7 +421,7 @@
               <th>DAY</th><th>色</th><th>アーティスト名</th><th>ステージ</th><th>ライブ開始</th><th>ライブ終了</th>
               <th>尺(分)</th><th>転換(分)</th>
               <th>特典会場</th><th>特典会開始</th><th>特典会終了</th><th>メモ</th>
-              <th>動員数</th><th>チケット売上</th><th>好感度</th><th></th>
+              <th class="admin-field">動員数</th><th class="admin-field">チケット売上</th><th class="admin-field">好感度</th><th></th>
             </tr>
           </thead>
           <tbody id="artistTbody"></tbody>
@@ -478,7 +506,7 @@
 
   function defaultState(){
     return {
-      event:{ name:"", venue:"" },
+      event:{ name:"", venue:"", adminPin:"" },
       days:[ makeDefaultDay(1) ],
       stages:[ {id:uid(), name:"Aステージ"}, {id:uid(), name:"Bステージ"} ],
       tokutenSpots:[ {id:uid(), name:"特典会場1"}, {id:uid(), name:"特典会場2"} ],
@@ -519,6 +547,19 @@
   function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 
   let state = loadState();
+
+  // ---------- Admin-only visibility (動員数/チケット売上/イベンター好感度) ----------
+  // This is a lightweight, client-side-only view gate — not real security (all
+  // data still lives in this browser's localStorage and is readable via devtools).
+  // Its purpose is to keep casual viewers (e.g. staff sharing a laptop) from
+  // seeing internal business numbers by default, not to protect against a
+  // determined attacker. Login state is intentionally NOT persisted: it resets
+  // to locked every time the page is loaded/reloaded.
+  let adminUnlocked = false;
+  function adminFieldsVisible(){
+    const pin = (state.event.adminPin||"").trim();
+    return !pin || adminUnlocked;
+  }
 
   // ---------- time helpers ----------
   function isValidTime(s){
@@ -748,11 +789,15 @@
         changeoverMin: /^[0-9]+$/.test(changeoverNm) ? changeoverNm : "",
         tokutenSpotId: tokutenNm ? findOrCreateTokuten(tokutenNm) : "",
         tokutenStart: isValidTime(tokutenStart)?tokutenStart:"", tokutenEnd: isValidTime(tokutenEnd)?tokutenEnd:"",
-        memo,
-        audience: /^[0-9]+$/.test(audienceNm) ? audienceNm : "",
-        ticketSales: /^[0-9]+$/.test(ticketSalesNm) ? ticketSalesNm : "",
-        favorability: /^[1-5]$/.test(favorabilityNm) ? favorabilityNm : ""
+        memo
       };
+      // 動員数/チケット売上/イベンター好感度は管理者専用項目のため、ロック中は
+      // CSVにその列があっても一切読み取らない（既存値もCSV経由では変更されない）。
+      if(adminFieldsVisible()){
+        fields.audience = /^[0-9]+$/.test(audienceNm) ? audienceNm : "";
+        fields.ticketSales = /^[0-9]+$/.test(ticketSalesNm) ? ticketSalesNm : "";
+        fields.favorability = /^[1-5]$/.test(favorabilityNm) ? favorabilityNm : "";
+      }
 
       let existing = null;
       if(mode === "upsert"){
@@ -780,14 +825,17 @@
   }
 
   function exportCSV(){
-    const lines = [CSV_HEADERS.map(csvField).join(",")];
+    const showAdmin = adminFieldsVisible();
+    const headers = showAdmin ? CSV_HEADERS : CSV_HEADERS.slice(0,11);
+    const lines = [headers.map(csvField).join(",")];
     state.artists.forEach(a=>{
-      lines.push([
+      const row = [
         dayLabel(a.dayId), a.name, stageName(a.stageId), a.liveStart||"", a.liveEnd||"",
         a.durationMin||"", a.changeoverMin||"",
-        tokutenName(a.tokutenSpotId), a.tokutenStart||"", a.tokutenEnd||"", a.memo||"",
-        a.audience||"", a.ticketSales||"", a.favorability||""
-      ].map(csvField).join(","));
+        tokutenName(a.tokutenSpotId), a.tokutenStart||"", a.tokutenEnd||"", a.memo||""
+      ];
+      if(showAdmin) row.push(a.audience||"", a.ticketSales||"", a.favorability||"");
+      lines.push(row.map(csvField).join(","));
     });
     downloadBlob(lines.join("\n"), (state.event.name||"timetable")+"_artists.csv", "text/csv;charset=utf-8");
   }
@@ -1045,6 +1093,7 @@
   function renderSettings(){
     document.getElementById("evName").value = state.event.name||"";
     document.getElementById("evVenue").value = state.event.venue||"";
+    document.getElementById("evAdminPin").value = state.event.adminPin||"";
     renderDayCards();
 
     const stageChips = document.getElementById("stageChips");
@@ -1152,9 +1201,9 @@
         <td>${timeFieldHtml("tokutenStart", a.tokutenStart)}</td>
         <td>${timeFieldHtml("tokutenEnd", a.tokutenEnd)}</td>
         <td><input type="text" data-role="memo" value="${escapeAttr(a.memo)}" style="min-width:100px;"></td>
-        <td><input type="number" data-role="audience" min="0" step="1" value="${escapeAttr(a.audience||"")}" style="width:70px;" title="動員数（人）"></td>
-        <td><input type="number" data-role="ticketSales" min="0" step="100" value="${escapeAttr(a.ticketSales||"")}" style="width:90px;" title="チケット売上（円）"></td>
-        <td><select data-role="favorability" style="min-width:80px;" title="イベンター好感度">
+        <td class="admin-field"><input type="number" data-role="audience" min="0" step="1" value="${escapeAttr(a.audience||"")}" style="width:70px;" title="動員数（人）"></td>
+        <td class="admin-field"><input type="number" data-role="ticketSales" min="0" step="100" value="${escapeAttr(a.ticketSales||"")}" style="width:90px;" title="チケット売上（円）"></td>
+        <td class="admin-field"><select data-role="favorability" style="min-width:80px;" title="イベンター好感度">
           <option value="">（未評価）</option>
           <option value="1">★☆☆☆☆</option>
           <option value="2">★★☆☆☆</option>
@@ -1582,6 +1631,13 @@
     const wrap = document.getElementById("statsTabWrap");
     if(!wrap) return;
     wrap.innerHTML = "";
+    if(!adminFieldsVisible()){
+      const lockedCard = document.createElement("div");
+      lockedCard.className = "card";
+      lockedCard.innerHTML = `<h2>実績集計</h2><div class="helptext">この画面は管理者専用です。ヘッダーの「管理者ログイン」からPINを入力してください。</div>`;
+      wrap.appendChild(lockedCard);
+      return;
+    }
 
     let grandAudience=0, grandSales=0, grandFavSum=0, grandFavCount=0;
     state.days.forEach(d=>{
@@ -1634,6 +1690,25 @@
     });
   }
 
+  // Shows/hides every element tagged admin-field (nav tab, table columns, form
+  // fields) based on the current lock state, and bounces off the stats tab if
+  // it's active but has just become hidden. Also refreshes the login button text.
+  function applyAdminVisibility(){
+    const visible = adminFieldsVisible();
+    document.querySelectorAll(".admin-field").forEach(el=>{ el.style.display = visible ? "" : "none"; });
+    const statsBtn = document.querySelector('nav.tabs button[data-tab="stats"]');
+    if(!visible && statsBtn && statsBtn.classList.contains("active")){
+      document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+      document.querySelectorAll(".tabcontent").forEach(t=>t.classList.remove("active"));
+      const settingsBtn = document.querySelector('nav.tabs button[data-tab="settings"]');
+      const settingsTab = document.getElementById("tab-settings");
+      if(settingsBtn) settingsBtn.classList.add("active");
+      if(settingsTab) settingsTab.classList.add("active");
+    }
+    const toggleBtn = document.getElementById("btnAdminToggle");
+    if(toggleBtn) toggleBtn.textContent = adminUnlocked ? "管理者モード：ON（ログアウト）" : "管理者ログイン";
+  }
+
   // ---------- Master render ----------
   function renderAll(){
     renderSettings();
@@ -1645,6 +1720,7 @@
     renderStatsTab();
     renderArtistNameList();
     updateClock();
+    applyAdminVisibility();
     document.title = (state.event.name?state.event.name+" - ":"")+"CueFes";
   }
 
@@ -1736,6 +1812,49 @@
 
   document.getElementById("evName").addEventListener("change", e=>{ state.event.name=e.target.value.trim(); saveState(); renderAll(); });
   document.getElementById("evVenue").addEventListener("change", e=>{ state.event.venue=e.target.value.trim(); saveState(); renderAll(); });
+  document.getElementById("evAdminPin").addEventListener("change", e=>{ state.event.adminPin=e.target.value.trim(); saveState(); renderAll(); });
+
+  // ---------- Admin login modal ----------
+  function openAdminModal(){
+    document.getElementById("adminPinError").style.display = "none";
+    document.getElementById("adminPinInput").value = "";
+    document.getElementById("adminModal").style.display = "flex";
+    document.getElementById("adminPinInput").focus();
+  }
+  function closeAdminModal(){
+    document.getElementById("adminModal").style.display = "none";
+  }
+  document.getElementById("btnAdminToggle").addEventListener("click", ()=>{
+    if(adminUnlocked){
+      adminUnlocked = false;
+      renderAll();
+      return;
+    }
+    const pin = (state.event.adminPin||"").trim();
+    if(!pin){
+      alert("① 基本設定タブの「管理者設定」で、まず管理者PINを設定してください。");
+      return;
+    }
+    openAdminModal();
+  });
+  document.getElementById("adminModalCancel").addEventListener("click", closeAdminModal);
+  document.getElementById("adminModal").addEventListener("click", e=>{
+    if(e.target.id === "adminModal") closeAdminModal();
+  });
+  document.getElementById("adminModalSubmit").addEventListener("click", ()=>{
+    const entered = document.getElementById("adminPinInput").value;
+    const pin = (state.event.adminPin||"").trim();
+    if(entered === pin){
+      adminUnlocked = true;
+      closeAdminModal();
+      renderAll();
+    } else {
+      document.getElementById("adminPinError").style.display = "block";
+    }
+  });
+  document.getElementById("adminPinInput").addEventListener("keydown", e=>{
+    if(e.key==="Enter"){ e.preventDefault(); document.getElementById("adminModalSubmit").click(); }
+  });
 
   document.querySelectorAll('[data-daycount]').forEach(b=>{
     b.addEventListener("click", ()=> setDayCount(parseInt(b.dataset.daycount,10)));
@@ -1799,9 +1918,9 @@
       tokutenSpotId: document.getElementById("afTokuten").value,
       tokutenStart: ts, tokutenEnd: te,
       memo: document.getElementById("afMemo").value.trim(),
-      audience: document.getElementById("afAudience").value.trim(),
-      ticketSales: document.getElementById("afTicketSales").value.trim(),
-      favorability: document.getElementById("afFavorability").value
+      audience: adminFieldsVisible() ? document.getElementById("afAudience").value.trim() : "",
+      ticketSales: adminFieldsVisible() ? document.getElementById("afTicketSales").value.trim() : "",
+      favorability: adminFieldsVisible() ? document.getElementById("afFavorability").value : ""
     };
     if(!newArtist.durationMin) syncDurationFromTimes(newArtist);
     state.artists.push(newArtist);
@@ -1826,7 +1945,8 @@
   });
   document.getElementById("btnCsvExport").addEventListener("click", exportCSV);
   document.getElementById("btnCsvTemplate").addEventListener("click", ()=>{
-    downloadBlob(CSV_HEADERS.map(csvField).join(",")+"\n", "artist_template.csv", "text/csv;charset=utf-8");
+    const headers = adminFieldsVisible() ? CSV_HEADERS : CSV_HEADERS.slice(0,11);
+    downloadBlob(headers.map(csvField).join(",")+"\n", "artist_template.csv", "text/csv;charset=utf-8");
   });
 
   document.getElementById("ocrFileInput").addEventListener("change", e=>{
