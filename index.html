@@ -494,6 +494,7 @@
 
   const STORAGE_KEY = "idolfes_timetable_v2";
   const STORAGE_KEY_V1 = "idolfes_timetable_v1";
+  const ARTIST_HISTORY_KEY = "cuefes_artist_history_v1";
   const PALETTE = ["#ffb3c6","#b3e5ff","#c8f7c5","#ffe3a3","#d9b3ff","#ffc9de","#a3f0e0",
                     "#ffd6a3","#b3c6ff","#f7c5e0","#c5e8f7","#e0f7c5"];
   const PRINT_HEIGHT_BUDGET = 940; // px budget for one A4 portrait page content height
@@ -544,9 +545,67 @@
     }catch(e){ /* fall through */ }
     return defaultState();
   }
-  function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  // ---------- Artist history database (persists across events / 全データ削除) ----------
+  // This is intentionally stored under its OWN localStorage key, completely
+  // separate from STORAGE_KEY. That's what lets it survive "全データ削除" (which
+  // only resets `state`) and carry booking-relevant numbers forward from one
+  // event to the next, keyed by artist name.
+  function loadArtistHistory(){
+    try{
+      const raw = localStorage.getItem(ARTIST_HISTORY_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)) return parsed;
+      }
+    }catch(e){ /* fall through */ }
+    return [];
+  }
+  function saveArtistHistory(){ localStorage.setItem(ARTIST_HISTORY_KEY, JSON.stringify(artistHistory)); }
+
+  // Re-syncs the history database from the artists currently in `state` every
+  // time state is saved. Each artist+DAY+event combination is upserted by a
+  // composite key, so re-editing the same artist's numbers within the same
+  // event/DAY updates the existing record instead of creating duplicates.
+  // Artists with no 動員数/チケット売上/イベンター好感度 entered yet are skipped
+  // (nothing worth recording), and an event with no name is skipped entirely
+  // since there'd be no meaningful way to label where the numbers came from.
+  function syncArtistHistoryFromCurrentEvent(){
+    const eventName = (state.event.name||"").trim();
+    if(!eventName) return;
+    let changed = false;
+    state.artists.forEach(a=>{
+      const name = (a.name||"").trim();
+      if(!name) return;
+      const audience = (a.audience==null?"":String(a.audience)).trim();
+      const ticketSales = (a.ticketSales==null?"":String(a.ticketSales)).trim();
+      const favorability = (a.favorability==null?"":String(a.favorability)).trim();
+      if(!audience && !ticketSales && !favorability) return;
+      const day = byId(state.days, a.dayId);
+      const dayLabel = day ? day.label : "";
+      const dayDate = day ? (day.date||"") : "";
+      const key = eventName+"‖"+dayLabel+"‖"+name;
+      let entry = artistHistory.find(h=>h._key===key);
+      if(!entry){
+        entry = { id:uid(), _key:key, artistName:name, eventName, dayLabel, dayDate, audience:"", ticketSales:"", favorability:"", updatedAt:0 };
+        artistHistory.push(entry);
+        changed = true;
+      }
+      if(entry.audience!==audience || entry.ticketSales!==ticketSales || entry.favorability!==favorability || entry.dayDate!==dayDate){
+        entry.audience = audience; entry.ticketSales = ticketSales; entry.favorability = favorability;
+        entry.dayDate = dayDate; entry.updatedAt = Date.now();
+        changed = true;
+      }
+    });
+    if(changed) saveArtistHistory();
+  }
+
+  function saveState(){
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    syncArtistHistoryFromCurrentEvent();
+  }
 
   let state = loadState();
+  let artistHistory = loadArtistHistory();
 
   // ---------- Admin-only visibility (動員数/チケット売上/イベンター好感度) ----------
   // This is a lightweight, client-side-only view gate — not real security (all
@@ -1688,6 +1747,149 @@
         </div>`;
       wrap.appendChild(card);
     });
+
+    const historyCard = document.createElement("div");
+    historyCard.className = "card";
+    historyCard.innerHTML = `
+      <h2>アーティスト別 通算実績（全イベント）</h2>
+      <div class="helptext" style="margin-top:-6px;margin-bottom:10px;">
+        このイベントに限らず、これまで動員数・チケット売上・イベンター好感度を入力したすべてのイベント・アーティストの通算成績です。次回以降のブッキング検討にご活用ください。「①基本設定」タブでイベント名を入力していないと、このイベントの実績は記録されません。「全データ削除」を行ってもこのデータベースは消えません。
+      </div>
+      <div id="artistHistoryWrap"></div>`;
+    wrap.appendChild(historyCard);
+    renderArtistHistorySection(historyCard.querySelector("#artistHistoryWrap"));
+  }
+
+  // ---------- Artist history: aggregation, sortable table, CSV export ----------
+  function computeArtistHistoryAggregates(){
+    const map = new Map();
+    artistHistory.forEach(h=>{
+      if(!map.has(h.artistName)) map.set(h.artistName, []);
+      map.get(h.artistName).push(h);
+    });
+    const rows = [];
+    map.forEach((entries, name)=>{
+      let audSum=0, audCount=0, salesSum=0, salesCount=0, favSum=0, favCount=0, lastDate="";
+      entries.forEach(e=>{
+        const aud = parseInt(e.audience,10); if(!isNaN(aud)){ audSum+=aud; audCount++; }
+        const sales = parseInt(e.ticketSales,10); if(!isNaN(sales)){ salesSum+=sales; salesCount++; }
+        const fav = parseInt(e.favorability,10); if(!isNaN(fav) && fav>=1 && fav<=5){ favSum+=fav; favCount++; }
+        if(e.dayDate && e.dayDate>lastDate) lastDate = e.dayDate;
+      });
+      const sortedEntries = entries.slice().sort((a,b)=> (a.dayDate||"") < (b.dayDate||"") ? 1 : -1);
+      rows.push({
+        name, appearances: entries.length,
+        audienceTotal: audSum, audienceAvg: audCount ? audSum/audCount : null,
+        salesTotal: salesSum, salesAvg: salesCount ? salesSum/salesCount : null,
+        favAvg: favCount ? favSum/favCount : null,
+        lastDate: lastDate || null,
+        lastEvent: sortedEntries[0] ? sortedEntries[0].eventName : "",
+        entries: sortedEntries
+      });
+    });
+    return rows;
+  }
+
+  let artistHistorySortKey = "audienceTotal", artistHistorySortDir = "desc";
+  const ARTIST_HISTORY_COLS = [
+    {key:"name", label:"アーティスト名"},
+    {key:"appearances", label:"通算出演回数"},
+    {key:"audienceTotal", label:"動員数合計"},
+    {key:"audienceAvg", label:"動員数平均"},
+    {key:"salesTotal", label:"チケット売上合計"},
+    {key:"salesAvg", label:"チケット売上平均"},
+    {key:"favAvg", label:"好感度平均"},
+    {key:"lastDate", label:"直近出演"},
+  ];
+
+  function renderArtistHistorySection(container){
+    if(!container) return;
+    const rows = computeArtistHistoryAggregates();
+    const dir = artistHistorySortDir==="asc" ? 1 : -1;
+    rows.sort((a,b)=>{
+      const av = a[artistHistorySortKey], bv = b[artistHistorySortKey];
+      if(artistHistorySortKey==="name") return dir*String(av).localeCompare(String(bv),"ja");
+      const an = av==null ? -Infinity : av, bn = bv==null ? -Infinity : bv;
+      return dir*(an-bn);
+    });
+    const thead = `<tr>${ARTIST_HISTORY_COLS.map(c=>
+      `<th data-sort="${c.key}" style="cursor:pointer;white-space:nowrap;">${escapeHtml(c.label)}${artistHistorySortKey===c.key ? (artistHistorySortDir==="asc"?" ▲":" ▼") : ""}</th>`
+    ).join("")}<th></th></tr>`;
+    const tbody = rows.length ? rows.map(r=>`
+      <tr>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${r.appearances}</td>
+        <td>${r.audienceTotal.toLocaleString()} 人</td>
+        <td>${r.audienceAvg!=null ? Math.round(r.audienceAvg).toLocaleString()+" 人" : "‐"}</td>
+        <td>¥${r.salesTotal.toLocaleString()}</td>
+        <td>${r.salesAvg!=null ? "¥"+Math.round(r.salesAvg).toLocaleString() : "‐"}</td>
+        <td>${r.favAvg!=null ? r.favAvg.toFixed(1)+" / 5" : "‐"}</td>
+        <td>${r.lastDate ? escapeHtml(r.lastDate)+(r.lastEvent?"（"+escapeHtml(r.lastEvent)+"）":"") : "‐"}</td>
+        <td><details><summary style="cursor:pointer;color:var(--accent2);font-size:12px;">内訳</summary>
+          <table class="data" style="margin-top:6px;">
+            <thead><tr><th>イベント</th><th>DAY</th><th>日付</th><th>動員数</th><th>チケット売上</th><th>好感度</th></tr></thead>
+            <tbody>${r.entries.map(e=>`
+              <tr>
+                <td>${escapeHtml(e.eventName)}</td>
+                <td>${escapeHtml(e.dayLabel)}</td>
+                <td>${escapeHtml(e.dayDate||"‐")}</td>
+                <td>${e.audience ? escapeHtml(e.audience)+" 人" : "‐"}</td>
+                <td>${e.ticketSales ? "¥"+Number(e.ticketSales).toLocaleString() : "‐"}</td>
+                <td>${starText(e.favorability)}</td>
+              </tr>`).join("")}</tbody>
+          </table>
+        </details></td>
+      </tr>`).join("") : `<tr><td colspan="9" class="helptext">まだ実績データがありません。②DAY・時間設定・③アーティスト管理で動員数などを入力すると、ここに自動的に蓄積されていきます。</td></tr>`;
+
+    container.innerHTML = `
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;">
+        <div class="helptext" style="margin:0;">全${rows.length}組。列見出しをクリックすると並べ替えできます。</div>
+        <div class="row">
+          <button class="btn secondary" id="btnArtistHistoryExport">CSV出力</button>
+          <button class="btn danger" id="btnArtistHistoryClear">データベースをクリア</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data" id="artistHistoryTable">
+          <thead>${thead}</thead>
+          <tbody>${tbody}</tbody>
+        </table>
+      </div>`;
+
+    container.querySelectorAll("thead th[data-sort]").forEach(th=>{
+      th.addEventListener("click", ()=>{
+        const key = th.dataset.sort;
+        if(artistHistorySortKey===key){ artistHistorySortDir = artistHistorySortDir==="asc" ? "desc" : "asc"; }
+        else { artistHistorySortKey = key; artistHistorySortDir = (key==="name") ? "asc" : "desc"; }
+        renderArtistHistorySection(container);
+      });
+    });
+    const exportBtn = container.querySelector("#btnArtistHistoryExport");
+    if(exportBtn) exportBtn.addEventListener("click", exportArtistHistoryCSV);
+    const clearBtn = container.querySelector("#btnArtistHistoryClear");
+    if(clearBtn) clearBtn.addEventListener("click", ()=>{
+      if(!confirm("アーティスト実績データベース（全イベント分の通算実績）をすべて削除します。よろしいですか？（この操作は取り消せません。現在表示中のイベントのデータは削除されません）")) return;
+      artistHistory = [];
+      saveArtistHistory();
+      renderStatsTab();
+    });
+  }
+
+  function exportArtistHistoryCSV(){
+    const rows = computeArtistHistoryAggregates().sort((a,b)=> b.audienceTotal-a.audienceTotal);
+    const headers = ["アーティスト名","通算出演回数","動員数合計","動員数平均","チケット売上合計","チケット売上平均","イベンター好感度平均","直近出演日","直近出演イベント"];
+    const lines = [headers.map(csvField).join(",")];
+    rows.forEach(r=>{
+      lines.push([
+        r.name, r.appearances, r.audienceTotal,
+        r.audienceAvg!=null ? Math.round(r.audienceAvg) : "",
+        r.salesTotal,
+        r.salesAvg!=null ? Math.round(r.salesAvg) : "",
+        r.favAvg!=null ? r.favAvg.toFixed(2) : "",
+        r.lastDate||"", r.lastEvent||""
+      ].map(csvField).join(","));
+    });
+    downloadBlob(lines.join("\n"), "artist_history_database.csv", "text/csv;charset=utf-8");
   }
 
   // Shows/hides every element tagged admin-field (nav tab, table columns, form
@@ -1974,7 +2176,7 @@
   document.getElementById("btnOcrCommit").addEventListener("click", ocrCommitRows);
 
   document.getElementById("btnBackupExport").addEventListener("click", ()=>{
-    downloadBlob(JSON.stringify(state, null, 2), (state.event.name||"timetable")+"_backup.json", "application/json");
+    downloadBlob(JSON.stringify({ formatVersion:2, state, artistHistory }, null, 2), (state.event.name||"timetable")+"_backup.json", "application/json");
   });
   document.getElementById("fileBackupImport").addEventListener("change", e=>{
     const file = e.target.files[0]; if(!file) return;
@@ -1982,9 +2184,25 @@
     reader.onload = ()=>{
       try{
         const parsed = JSON.parse(reader.result);
-        if(!parsed.days || !parsed.stages || !parsed.artists) throw new Error("invalid");
-        if(!confirm("現在のデータを上書きします。よろしいですか？")) return;
-        state = parsed; saveState(); renderAll();
+        let newState = null, newHistory = null;
+        if(parsed.state && parsed.state.days && parsed.state.stages && parsed.state.artists){
+          // current backup format: { state, artistHistory }
+          newState = parsed.state;
+          if(Array.isArray(parsed.artistHistory)) newHistory = parsed.artistHistory;
+        } else if(parsed.days && parsed.stages && parsed.artists){
+          // older backup format: bare state object (no artist history database yet)
+          newState = parsed;
+        } else {
+          throw new Error("invalid");
+        }
+        let msg = "現在のイベントデータを上書きします。よろしいですか？";
+        if(newHistory) msg += "\nアーティスト実績データベース（通算実績）も、このファイルの内容で上書きされます。";
+        if(!confirm(msg)) return;
+        state = newState;
+        if(newHistory) artistHistory = newHistory;
+        saveState();
+        if(newHistory) saveArtistHistory();
+        renderAll();
       }catch(err){ alert("バックアップファイルの読み込みに失敗しました。"); }
     };
     reader.readAsText(file, "UTF-8");
