@@ -334,7 +334,14 @@
       <h2>テキスト／画像から一括取り込み</h2>
       <p class="helptext">
         出演者一覧をまとめて取り込めます。下のテキスト欄に<b>Twitter(X)の告知文やLINEでもらったテキストなどをそのまま貼り付けて</b>「候補を抽出」を押すだけでOKです（画像は使いません）。<br>
-        手元にあるのが画像だけの場合は、下の画像アップロード欄からOCR（文字認識）でテキスト化することもできます。<br>
+        手元にあるのが画像だけの場合は、下の画像アップロード欄からOCR（文字認識）でテキスト化することもできます。
+      </p>
+
+      <div class="row" style="margin-top:4px;margin-bottom:4px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);width:auto;"><input type="radio" name="ocrParseMode" value="time" checked style="width:auto;">時刻付きテキストから取り込む</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);width:auto;"><input type="radio" name="ocrParseMode" value="nameonly" style="width:auto;">アーティスト名だけを取り込む（時刻・ステージは後で手動入力）</label>
+      </div>
+      <p class="helptext" id="ocrParseModeHelp">
         認識のコツ：「10:30-11:00 グループ名」のように<b>1行に時刻＋アーティスト名</b>が入っている形式が最も正確です。「Aステージ」のような行を挟むと、それ以降の行に自動でステージ名が割り当てられます。<br>
         「13:40~14:00(20)」のように時刻の後ろに<b>尺（分）が括弧書きされている場合</b>は自動で無視されます。また「時刻＋尺」の行の次にアーティスト名だけの行が続く2行形式にも対応しています。
       </p>
@@ -1107,13 +1114,45 @@
     return rows;
   }
 
-  function renderOcrPreview(rows){
+  // Simpler counterpart to parseOcrText for lineup announcements that have no
+  // times at all (e.g. a plain Twitter lineup list) — every non-empty line
+  // becomes one artist-name candidate with blank start/end/lane, left for the
+  // user to fill in afterward via the gantt chart or artist table. A leading
+  // "Aステージ"-style line still switches the current lane for lines below it,
+  // same as parseOcrText, since some plain-text lineups are still grouped that
+  // way even without per-line times.
+  function parseNameOnlyText(text){
+    const lines = (text||"").split(/\n/).map(l=>l.trim()).filter(l=>l.length>0);
+    const laneRe = /(ステージ|STAGE|Stage|会場|エリア|AREA|Area)/;
+    // Strips one leading list marker (bullet/number/hashtag/enumeration circle)
+    // per line, e.g. "1. ", "① ", "・", "-", "#". Only the leading marker is
+    // removed so it doesn't eat meaningful characters inside the name itself.
+    const leadingMarkerRe = /^(?:[①②③④⑤⑥⑦⑧⑨⑩]|[0-9]{1,3}[.\)、．]|[-‐‑–—ー・•●○◎★☆#＃])\s*/;
+    const trimChars = /^[\s|／\/、,\[\]【】()（）]+|[\s|／\/、,\[\]【】()（）]+$/g;
+    let currentLane = "";
+    const rows = [];
+    lines.forEach(line=>{
+      if(laneRe.test(line) && line.length<=20){
+        currentLane = line.replace(/[【】\[\]()（）]/g,"").trim();
+        return;
+      }
+      const name = line.replace(leadingMarkerRe,"").replace(trimChars,"").trim();
+      if(!name) return;
+      rows.push({ lane: currentLane, name, start:"", end:"", raw: line });
+    });
+    return rows;
+  }
+
+  function renderOcrPreview(rows, mode){
     const wrap = document.getElementById("ocrPreviewWrap");
     fillDaySelect(document.getElementById("ocrDaySelect"), state.days[0].id);
     const tbody = document.getElementById("ocrPreviewBody");
     tbody.innerHTML = "";
     if(rows.length===0){
-      tbody.innerHTML = `<tr><td colspan="6" class="helptext">時刻パターン（例: 10:00-10:30）を含む行が見つかりませんでした。上のテキストを「10:00-10:30 グループ名」のような形式に手直しして、もう一度「候補を抽出」を押してください。</td></tr>`;
+      const emptyMsg = mode==="nameonly"
+        ? "アーティスト名として取り込める行が見つかりませんでした。1行に1組ずつ、名前を貼り付けてください。"
+        : "時刻パターン（例: 10:00-10:30）を含む行が見つかりませんでした。上のテキストを「10:00-10:30 グループ名」のような形式に手直しして、もう一度「候補を抽出」を押してください。";
+      tbody.innerHTML = `<tr><td colspan="6" class="helptext">${emptyMsg}</td></tr>`;
       wrap.style.display = "block";
       return;
     }
@@ -2454,7 +2493,23 @@
   });
   document.getElementById("btnOcrParse").addEventListener("click", ()=>{
     const text = document.getElementById("ocrRawText").value;
-    renderOcrPreview(parseOcrText(text));
+    const mode = document.querySelector('input[name="ocrParseMode"]:checked').value; // "time" | "nameonly"
+    const rows = mode==="nameonly" ? parseNameOnlyText(text) : parseOcrText(text);
+    renderOcrPreview(rows, mode);
+  });
+  document.querySelectorAll('input[name="ocrParseMode"]').forEach(r=>{
+    r.addEventListener("change", ()=>{
+      const mode = document.querySelector('input[name="ocrParseMode"]:checked').value;
+      const help = document.getElementById("ocrParseModeHelp");
+      const textarea = document.getElementById("ocrRawText");
+      if(mode==="nameonly"){
+        help.innerHTML = "アーティスト名を1行に1組ずつ貼り付けてください。「Aステージ」のような行を挟むと、以降の行にステージ名だけ自動で割り当てられます（時刻は空欄のまま取り込まれるので、後でタイムテーブル上またはアーティスト一覧から手動入力してください）。<br>先頭の「1. 」「・」「①」「#」のような番号・記号は自動で取り除かれます。";
+        textarea.placeholder = "例：\nAステージ\nサンプル☆ガールズ\nキラキラユニット\nBステージ\nネオン戦隊";
+      } else {
+        help.innerHTML = "認識のコツ：「10:30-11:00 グループ名」のように<b>1行に時刻＋アーティスト名</b>が入っている形式が最も正確です。「Aステージ」のような行を挟むと、それ以降の行に自動でステージ名が割り当てられます。<br>「13:40~14:00(20)」のように時刻の後ろに<b>尺（分）が括弧書きされている場合</b>は自動で無視されます。また「時刻＋尺」の行の次にアーティスト名だけの行が続く2行形式にも対応しています。";
+        textarea.placeholder = "例：\nAステージ\n10:00-10:30 サンプル☆ガールズ\n10:30-11:00 キラキラユニット\nBステージ\n10:00-10:30 ネオン戦隊";
+      }
+    });
   });
   document.getElementById("btnOcrCommit").addEventListener("click", ocrCommitRows);
 
