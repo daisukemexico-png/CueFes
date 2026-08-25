@@ -83,6 +83,14 @@
   table.data input,table.data select{font-size:12px;padding:4px 5px;}
   table.data td.color-cell{width:30px;}
   .swatch{width:20px;height:20px;border-radius:5px;border:1px solid #0003;cursor:pointer;}
+  .preset-chip{background:var(--panel2);border:1px solid var(--border);border-radius:20px;padding:6px 13px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;gap:7px;}
+  .preset-chip .preset-dot{width:14px;height:14px;border-radius:50%;border:1px solid #0002;flex:0 0 14px;}
+  .preset-chip.active{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600;}
+  .colorfield-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px 16px;margin-top:10px;}
+  .colorfield{display:flex;align-items:center;gap:8px;}
+  .colorfield input[type=color]{width:34px;height:30px;padding:2px;border:1px solid var(--border);border-radius:6px;background:var(--panel);cursor:pointer;flex:0 0 34px;}
+  .colorfield span{font-size:12.5px;color:var(--text);}
+  #printPreview{border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:14px;}
   .del-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:15px;}
   .warn-banner{
     background:#fdecec;border:1px solid var(--danger);color:#8f1327;
@@ -152,7 +160,29 @@
   .gantt-v .block .resize-handle.bottom{bottom:-3px;}
   .gantt-v .block.dragging{opacity:.85;z-index:5;box-shadow:0 3px 10px #0008;}
 
-  /* ---- Print ---- */
+  /* ---- Print / image-export shared styling ----
+     Colors below are driven by CSS custom properties so the output can be
+     restyled to match a flyer's color scheme (see PRINT_STYLE_PRESETS /
+     applyPrintStyleVars). The values here are just fallback defaults and
+     match the original fixed white/black look. This same .print-output class
+     is reused by the offscreen PNG-export scratch container (see exportPng),
+     not just the hidden #print-area used for window.print(), so both outputs
+     share one styling source of truth. */
+  .print-output{
+    --print-bg:#ffffff; --print-title:#000000; --print-sub:#333333;
+    --print-header-bg:#eeeeee; --print-header-text:#000000;
+    --print-border:#cccccc; --print-tick:#333333;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact;
+  }
+  .print-output .print-page{ background:var(--print-bg); }
+  .print-output .print-title{ font-size:17px; font-weight:bold; margin-bottom:2px; color:var(--print-title); }
+  .print-output .print-sub{ font-size:11px; color:var(--print-sub); margin-bottom:10px; }
+  .print-output .gantt-v .lane{ border-left:1px solid var(--print-border); }
+  .print-output .lane-header{ background:var(--print-header-bg); color:var(--print-header-text); border-bottom:2px solid var(--print-border); }
+  .print-output .block{ color:#111; }
+  .print-output .block b{ color:#111; }
+  .print-output .block.changeover-block{ color:#555; border:1px dashed var(--print-border); }
+  .print-output .axis-col .tick{ color:var(--print-tick); }
   @media print{
     @page{ size: A4 portrait; margin: 10mm; }
     body *{ visibility:hidden; }
@@ -160,13 +190,6 @@
     #print-area{ display:block; position:absolute; left:0; top:0; width:100%; }
     .print-page{ page-break-after:always; padding:0; }
     .print-page:last-child{ page-break-after:auto; }
-    .print-title{ font-size:17px; font-weight:bold; margin-bottom:2px; color:#000; }
-    .print-sub{ font-size:11px; color:#333; margin-bottom:10px; }
-    .print-page .lane-header{ background:#eee; color:#000; }
-    .print-page .block{ color:#111; }
-    .print-page .block b{ color:#111; }
-    .print-page .block.changeover-block{ color:#555; }
-    .print-page .axis-col .tick{ color:#333; }
   }
 </style>
 </head>
@@ -459,9 +482,32 @@
       </div>
       <p class="helptext">
         下のボタンを押すと印刷ダイアログが開きます。印刷先を「PDFに保存」にすると、そのままPDFファイルとして出力できます（A4縦向き）。<br>
-        時間軸を縦（上→下）、ステージ／特典会場を横並びの列にしたレイアウトで、DAYごと・種別ごとに1ページずつ出力されます。開催時間が長い場合は自動で文字を縮小して1ページに収めようとしますが、収まらない場合は続きのページに続きます。
+        時間軸を縦（上→下）、ステージ／特典会場を横並びの列にしたレイアウトで、DAYごと・種別ごとに1ページずつ出力されます。開催時間が長い場合は自動で文字を縮小して1ページに収めようとしますが、収まらない場合は続きのページに続きます。<br>
+        印刷ダイアログでは「背景のグラフィック」（Chromeの場合）を有効にしないと、下で設定した背景色などが出力に反映されません。
       </p>
       <button class="btn" id="btnPrint" style="font-size:15px;padding:12px 22px;">タイムテーブルPDFを出力する</button>
+    </div>
+
+    <div class="card">
+      <h2>PNG画像として出力</h2>
+      <p class="helptext">
+        上で選択したDAY・種別ごとに、タイムテーブルを1枚ずつPNG画像として書き出します。「背景を透明にする」を選ぶと、フライヤーのデザインデータ（Photoshopなど）にタイムテーブルを画像として重ねて配置できます。<br>
+        PDF出力（印刷）と異なり、PNG画像は背景を透明にできます。ただしPDF出力とは別の仕組みのため、初回利用時に画像変換用のライブラリをインターネットから読み込みます（要ネット接続）。
+      </p>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);margin-bottom:10px;"><input type="checkbox" id="chkPngTransparent" checked style="width:auto;"> 背景を透明にする（チェックを外すと、下で設定した背景色を使用します）</label>
+      <button class="btn secondary" id="btnExportPng" style="font-size:15px;padding:12px 22px;">PNG画像で保存する</button>
+      <div class="helptext" id="pngExportStatus" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>出力の色味（デザイン）</h2>
+      <p class="helptext">配布用フライヤーの色味に合わせて、出力するタイムテーブルの背景色や見出し色などを変更できます。プリセットから選んだ上で、下の各項目を個別に調整することもできます。設定はイベントデータの一部として保存され、バックアップにも含まれます。</p>
+      <label>プリセットから選ぶ</label>
+      <div id="printPresetChips" class="chip-list"></div>
+      <div class="helptext" id="printStyleStatus" style="margin-top:6px;"></div>
+      <label style="margin-top:16px;">個別に調整する</label>
+      <div class="colorfield-grid" id="printColorFields"></div>
+      <div id="printPreview"></div>
     </div>
   </div>
 
@@ -483,7 +529,7 @@
 </main>
 
 <!-- Hidden print-only content, populated just before printing -->
-<div id="print-area"></div>
+<div id="print-area" class="print-output"></div>
 
 <!-- Shared autocomplete suggestions for artist-name fields (form / table / OCR preview) -->
 <datalist id="artistNameList"></datalist>
@@ -499,6 +545,50 @@
                     "#ffd6a3","#b3c6ff","#f7c5e0","#c5e8f7","#e0f7c5"];
   const PRINT_HEIGHT_BUDGET = 940; // px budget for one A4 portrait page content height
 
+  // ---------- Print output style (color scheme for PDF/print output) ----------
+  // Each field maps 1:1 to a --print-* CSS custom property applied to #print-area
+  // in buildPrintArea() via applyPrintStyleVars(). Presets are just starting
+  // points that fill in these fields; the fields themselves are what actually
+  // gets saved/used, so picking a preset and then tweaking a field is expected.
+  const PRINT_STYLE_FIELDS = [
+    {key:"pageBg",     varName:"--print-bg",          label:"ページ背景"},
+    {key:"titleColor", varName:"--print-title",       label:"タイトル文字"},
+    {key:"subColor",   varName:"--print-sub",         label:"サブ情報文字"},
+    {key:"headerBg",   varName:"--print-header-bg",   label:"レーンヘッダー背景"},
+    {key:"headerText", varName:"--print-header-text", label:"レーンヘッダー文字"},
+    {key:"borderColor",varName:"--print-border",      label:"罫線・区切り線"},
+    {key:"tickColor",  varName:"--print-tick",        label:"時刻目盛り文字"}
+  ];
+  const PRINT_STYLE_PRESETS = [
+    { id:"default", name:"標準（白基調）",
+      values:{ pageBg:"#ffffff", titleColor:"#000000", subColor:"#333333", headerBg:"#eeeeee", headerText:"#000000", borderColor:"#cccccc", tickColor:"#333333" } },
+    { id:"dark", name:"黒基調",
+      values:{ pageBg:"#1c1c24", titleColor:"#ffffff", subColor:"#c9c9d2", headerBg:"#33333f", headerText:"#ffffff", borderColor:"#4a4a58", tickColor:"#b8b8c4" } },
+    { id:"brand", name:"CueFesブランドカラー",
+      values:{ pageBg:"#fff5f9", titleColor:"#8f1149", subColor:"#0e6d8c", headerBg:"#b3185a", headerText:"#ffffff", borderColor:"#b3185a", tickColor:"#0e6d8c" } },
+    { id:"cream", name:"クリーム・温かみ",
+      values:{ pageBg:"#fbf4e6", titleColor:"#5a3e1b", subColor:"#8a6d3f", headerBg:"#efe0bd", headerText:"#5a3e1b", borderColor:"#d8c393", tickColor:"#8a6d3f" } }
+  ];
+  const DEFAULT_PRINT_STYLE = Object.assign({ preset:"default", pngTransparentBg:true }, PRINT_STYLE_PRESETS[0].values);
+  function clonePrintStyle(s){ return JSON.parse(JSON.stringify(s)); }
+  // Fills in a valid printStyle on any state object that may predate this
+  // feature (older localStorage data / older backup files), without touching
+  // an already-valid one, so upgrading never resets a user's chosen colors.
+  function normalizePrintStyle(s){
+    if(!s.printStyle || typeof s.printStyle!=="object"){
+      s.printStyle = clonePrintStyle(DEFAULT_PRINT_STYLE);
+      return s;
+    }
+    const merged = clonePrintStyle(DEFAULT_PRINT_STYLE);
+    PRINT_STYLE_FIELDS.forEach(f=>{
+      if(typeof s.printStyle[f.key]==="string" && /^#[0-9a-fA-F]{6}$/.test(s.printStyle[f.key])) merged[f.key] = s.printStyle[f.key];
+    });
+    merged.preset = typeof s.printStyle.preset==="string" ? s.printStyle.preset : "custom";
+    merged.pngTransparentBg = typeof s.printStyle.pngTransparentBg==="boolean" ? s.printStyle.pngTransparentBg : true;
+    s.printStyle = merged;
+    return s;
+  }
+
   function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36).slice(-4); }
 
   function makeDefaultDay(n){
@@ -511,7 +601,8 @@
       days:[ makeDefaultDay(1) ],
       stages:[ {id:uid(), name:"Aステージ"}, {id:uid(), name:"Bステージ"} ],
       tokutenSpots:[ {id:uid(), name:"特典会場1"}, {id:uid(), name:"特典会場2"} ],
-      artists:[]
+      artists:[],
+      printStyle: clonePrintStyle(DEFAULT_PRINT_STYLE)
     };
   }
 
@@ -520,7 +611,7 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if(raw){
         const parsed = JSON.parse(raw);
-        if(parsed.days && parsed.stages && parsed.artists) return parsed;
+        if(parsed.days && parsed.stages && parsed.artists) return normalizePrintStyle(parsed);
       }
       // migrate from older single-day version if present
       const rawV1 = localStorage.getItem(STORAGE_KEY_V1);
@@ -533,13 +624,13 @@
           day.liveEnd = old.event.liveEnd||"20:00";
           day.tokutenStart = old.event.tokutenStart||"10:00";
           day.tokutenEnd = old.event.tokutenEnd||"20:00";
-          return {
+          return normalizePrintStyle({
             event:{ name:old.event.name||"", venue:old.event.venue||"" },
             days:[day],
             stages: old.stages,
             tokutenSpots: old.tokutenSpots,
             artists: old.artists.map(a=>Object.assign({},a,{dayId:day.id}))
-          };
+          });
         }
       }
     }catch(e){ /* fall through */ }
@@ -1620,9 +1711,100 @@
     }).join("");
   }
 
+  // Renders the preset chips + individual color pickers in the output tab,
+  // and keeps them in sync with state.printStyle (e.g. after a backup import).
+  function renderPrintStyleControls(){
+    const presetWrap = document.getElementById("printPresetChips");
+    if(!presetWrap) return;
+    const ps = state.printStyle;
+    presetWrap.innerHTML = PRINT_STYLE_PRESETS.map(p=>{
+      const active = ps.preset===p.id;
+      return `<button type="button" class="preset-chip${active?" active":""}" data-preset="${p.id}">`
+        + `<span class="preset-dot" style="background:${p.values.headerBg}"></span>${escapeHtml(p.name)}</button>`;
+    }).join("");
+
+    const fieldWrap = document.getElementById("printColorFields");
+    fieldWrap.innerHTML = PRINT_STYLE_FIELDS.map(f=>{
+      return `<label class="colorfield"><input type="color" data-field="${f.key}" value="${ps[f.key]}"><span>${f.label}</span></label>`;
+    }).join("");
+
+    updatePrintStyleStatus();
+
+    const pngChk = document.getElementById("chkPngTransparent");
+    if(pngChk){
+      pngChk.checked = !!ps.pngTransparentBg;
+      pngChk.onchange = ()=>{
+        state.printStyle.pngTransparentBg = pngChk.checked;
+        saveState();
+      };
+    }
+
+    presetWrap.querySelectorAll(".preset-chip[data-preset]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const preset = PRINT_STYLE_PRESETS.find(p=>p.id===btn.dataset.preset);
+        if(!preset) return;
+        state.printStyle = Object.assign({preset:preset.id, pngTransparentBg: state.printStyle.pngTransparentBg}, clonePrintStyle(preset.values));
+        saveState();
+        renderPrintStyleControls();
+      });
+    });
+    fieldWrap.querySelectorAll('input[type=color]').forEach(inp=>{
+      inp.addEventListener("input", ()=>{
+        state.printStyle[inp.dataset.field] = inp.value;
+        state.printStyle.preset = "custom";
+        saveState();
+        // Only refresh the preset highlighting/status/preview, not the color
+        // inputs themselves, so the picker the user is actively using
+        // doesn't get re-rendered out from under them mid-drag.
+        presetWrap.querySelectorAll(".preset-chip").forEach(c=>c.classList.remove("active"));
+        updatePrintStyleStatus();
+        buildPrintPreview();
+      });
+    });
+    buildPrintPreview();
+  }
+
+  function updatePrintStyleStatus(){
+    const el = document.getElementById("printStyleStatus");
+    if(!el) return;
+    const ps = state.printStyle;
+    if(ps.preset==="custom"){
+      el.textContent = "現在の設定: カスタム（個別に調整済み）";
+    }else{
+      const p = PRINT_STYLE_PRESETS.find(x=>x.id===ps.preset);
+      el.textContent = "現在の設定: "+(p?p.name:"カスタム");
+    }
+  }
+
+  // Applies the current printStyle as CSS custom properties on #print-area,
+  // which the @media print rules (and the on-screen preview) read from.
+  function applyPrintStyleVars(el){
+    const ps = state.printStyle;
+    PRINT_STYLE_FIELDS.forEach(f=>{ el.style.setProperty(f.varName, ps[f.key]); });
+  }
+
+  // Small on-screen swatch preview of the current color choices, since the
+  // actual print layout only renders in the (hidden until print) #print-area.
+  function buildPrintPreview(){
+    const wrap = document.getElementById("printPreview");
+    if(!wrap) return;
+    const ps = state.printStyle;
+    wrap.style.background = ps.pageBg;
+    wrap.innerHTML = `
+      <div style="font-size:14px;font-weight:bold;color:${ps.titleColor};margin-bottom:2px;">プレビュー：イベント名 — ライブタイムテーブル</div>
+      <div style="font-size:11px;color:${ps.subColor};margin-bottom:10px;">DAY1 ・ 2026-01-01 ・ 会場名</div>
+      <div style="display:flex;border:1px solid ${ps.borderColor};border-radius:4px;overflow:hidden;">
+        <div style="flex:1;background:${ps.headerBg};color:${ps.headerText};font-size:12px;font-weight:bold;text-align:center;padding:6px 0;border-right:1px solid ${ps.borderColor};">Aステージ</div>
+        <div style="flex:1;background:${ps.headerBg};color:${ps.headerText};font-size:12px;font-weight:bold;text-align:center;padding:6px 0;">Bステージ</div>
+      </div>
+      <div style="font-size:10px;color:${ps.tickColor};margin-top:6px;">10:00 ── 時刻目盛りの色</div>
+    `;
+  }
+
   function buildPrintArea(){
     const area = document.getElementById("print-area");
     area.innerHTML = "";
+    applyPrintStyleVars(area);
     const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
     const includeLive = document.getElementById("chkPrintLive").checked;
     const includeTokuten = document.getElementById("chkPrintTokuten").checked;
@@ -1660,6 +1842,106 @@
     buildPrintArea();
     window.print();
   });
+
+  // ---------- PNG image export (for overlaying onto a flyer in image-editing software) ----------
+  // window.print() can never produce a transparent background (that's a
+  // browser-level constraint of the print pipeline, not something CSS can
+  // override), so a true transparent background requires a separate path:
+  // rendering each page to a <canvas> via html2canvas and exporting that as
+  // a PNG, which does support an alpha channel.
+  let html2canvasScriptPromise = null;
+  function loadHtml2CanvasScript(){
+    if(window.html2canvas) return Promise.resolve();
+    if(html2canvasScriptPromise) return html2canvasScriptPromise;
+    html2canvasScriptPromise = new Promise((resolve,reject)=>{
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+      s.onload = ()=>resolve();
+      s.onerror = ()=>{ html2canvasScriptPromise=null; reject(new Error("load failed")); };
+      document.head.appendChild(s);
+    });
+    return html2canvasScriptPromise;
+  }
+
+  async function exportPng(){
+    const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
+    const includeLive = document.getElementById("chkPrintLive").checked;
+    const includeTokuten = document.getElementById("chkPrintTokuten").checked;
+    const jobs = [];
+    state.days.filter(d=>selectedDayIds.includes(d.id)).forEach(day=>{
+      if(includeLive) jobs.push({day, kind:"live", title:"ライブタイムテーブル"});
+      if(includeTokuten) jobs.push({day, kind:"tokuten", title:"特典会タイムテーブル"});
+    });
+    if(jobs.length===0){
+      alert("出力するDAYとタイムテーブル種別を、上の「出力するDAY」「出力するタイムテーブル種別」から選択してください。");
+      return;
+    }
+
+    const statusEl = document.getElementById("pngExportStatus");
+    const btn = document.getElementById("btnExportPng");
+    btn.disabled = true;
+    if(statusEl) statusEl.textContent = "準備中…（初回はライブラリの読み込みに時間がかかることがあります）";
+    try{
+      await loadHtml2CanvasScript();
+    }catch(e){
+      if(statusEl) statusEl.textContent = "";
+      alert("PNG画像の書き出しに必要なライブラリの読み込みに失敗しました。インターネット接続を確認してください。");
+      btn.disabled = false;
+      return;
+    }
+
+    const transparent = document.getElementById("chkPngTransparent").checked;
+    const evName = (state.event.name || "timetable").replace(/[\\/:*?"<>|]/g,"_");
+
+    // Offscreen scratch container reusing the .print-output CSS rules (same
+    // colors/typography as the PDF), so the PNG matches the configured
+    // color scheme minus the page background when "transparent" is checked.
+    const scratch = document.createElement("div");
+    scratch.className = "print-output";
+    scratch.style.cssText = "position:fixed;left:-10000px;top:0;display:block;width:900px;";
+    document.body.appendChild(scratch);
+    applyPrintStyleVars(scratch);
+    if(transparent) scratch.style.setProperty("--print-bg","transparent");
+
+    try{
+      for(let i=0;i<jobs.length;i++){
+        const job = jobs[i];
+        if(statusEl) statusEl.textContent = `画像を作成中…（${i+1}/${jobs.length}）`;
+        scratch.innerHTML = "";
+        const p = document.createElement("div");
+        p.className = "print-page";
+        const h = document.createElement("div");
+        h.className = "print-title";
+        h.textContent = (state.event.name||"（イベント名未設定）")+" — "+job.title;
+        const sub = document.createElement("div");
+        sub.className = "print-sub";
+        sub.textContent = [job.day.label, job.day.date, state.event.venue].filter(Boolean).join(" ・ ");
+        const gantt = document.createElement("div");
+        gantt.className = "gantt-v-wrap";
+        p.appendChild(h); p.appendChild(sub); p.appendChild(gantt);
+        scratch.appendChild(p);
+        renderGanttInto(gantt, job.kind, job.day.id, {interactive:false});
+
+        const canvas = await window.html2canvas(p, { backgroundColor: transparent ? null : undefined, scale:2, useCORS:true });
+        const blob = await new Promise(res=>canvas.toBlob(res, "image/png"));
+        if(!blob) continue;
+        const filename = `${evName}_${job.day.label}_${job.kind==="live"?"ライブ":"特典会"}.png`;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      }
+      if(statusEl) statusEl.textContent = `完了：${jobs.length}枚のPNG画像を書き出しました。`;
+    }catch(err){
+      if(statusEl) statusEl.textContent = "";
+      alert("PNG画像の書き出し中にエラーが発生しました。");
+    }finally{
+      scratch.remove();
+      btn.disabled = false;
+    }
+  }
+  document.getElementById("btnExportPng").addEventListener("click", exportPng);
 
   // ---------- Stats (動員数・チケット売上・イベンター好感度の集計) ----------
   function computeDayTotals(dayId){
@@ -1919,6 +2201,7 @@
     renderLiveTab();
     renderTokutenTab();
     renderPrintDayChecks();
+    renderPrintStyleControls();
     renderStatsTab();
     renderArtistNameList();
     updateClock();
@@ -2198,7 +2481,7 @@
         let msg = "現在のイベントデータを上書きします。よろしいですか？";
         if(newHistory) msg += "\nアーティスト実績データベース（通算実績）も、このファイルの内容で上書きされます。";
         if(!confirm(msg)) return;
-        state = newState;
+        state = normalizePrintStyle(newState);
         if(newHistory) artistHistory = newHistory;
         saveState();
         if(newHistory) saveArtistHistory();
