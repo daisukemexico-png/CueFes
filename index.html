@@ -2167,8 +2167,16 @@
         <div class="helptext" style="margin:0;">全${rows.length}組。列見出しをクリックすると並べ替えできます。</div>
         <div class="row">
           <button class="btn secondary" id="btnArtistHistoryExport">CSV出力</button>
+          <button class="btn secondary" id="btnArtistHistoryExportJson">JSON出力</button>
+          <label class="btn secondary" style="cursor:pointer;">
+            JSON読込
+            <input type="file" id="fileArtistHistoryImport" accept=".json" style="display:none;">
+          </label>
           <button class="btn danger" id="btnArtistHistoryClear">データベースをクリア</button>
         </div>
+      </div>
+      <div class="helptext" style="margin-top:-4px;margin-bottom:10px;">
+        「CSV出力」はこの集計表（アーティストごとの合計・平均）を出力します。個々のイベント・DAYの記録を1件ずつ含む生データを別のPC・ブラウザに移したり、他のツールに渡したりしたい場合は「JSON出力」をお使いください。「JSON読込」で読み込むと、_key（イベント名・DAY・アーティスト名の組み合わせ）が一致する記録は更新日時が新しい方を採用し、それ以外は追加としてマージされます（上書き削除はされません）。
       </div>
       <div style="overflow-x:auto;">
         <table class="data" id="artistHistoryTable">
@@ -2187,6 +2195,16 @@
     });
     const exportBtn = container.querySelector("#btnArtistHistoryExport");
     if(exportBtn) exportBtn.addEventListener("click", exportArtistHistoryCSV);
+    const exportJsonBtn = container.querySelector("#btnArtistHistoryExportJson");
+    if(exportJsonBtn) exportJsonBtn.addEventListener("click", exportArtistHistoryJSON);
+    const importInput = container.querySelector("#fileArtistHistoryImport");
+    if(importInput) importInput.addEventListener("change", e=>{
+      const file = e.target.files[0]; if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=> importArtistHistoryJSONText(reader.result);
+      reader.readAsText(file, "UTF-8");
+      e.target.value = "";
+    });
     const clearBtn = container.querySelector("#btnArtistHistoryClear");
     if(clearBtn) clearBtn.addEventListener("click", ()=>{
       if(!confirm("アーティスト実績データベース（全イベント分の通算実績）をすべて削除します。よろしいですか？（この操作は取り消せません。現在表示中のイベントのデータは削除されません）")) return;
@@ -2195,6 +2213,46 @@
       renderStatsTab();
     });
   }
+
+  // Standalone export/import of the artist-history database as its own JSON
+  // file — distinct from the full state+history backup (btnBackupExport),
+  // for when the user wants to hand just this database to another tool, or
+  // merge it into a database in a different browser/PC. Import is additive
+  // (upsert-by-_key, newest updatedAt wins) rather than a destructive
+  // overwrite, since the whole point of this database is that it accumulates
+  // across events over time.
+  function exportArtistHistoryJSON(){
+    const payload = { formatVersion:1, type:"cuefes_artist_history", exportedAt:new Date().toISOString(), artistHistory };
+    downloadBlob(JSON.stringify(payload, null, 2), "artist_history_database.json", "application/json");
+  }
+  function importArtistHistoryJSONText(text){
+    let parsed;
+    try{ parsed = JSON.parse(text); }catch(e){ alert("JSONファイルの読み込みに失敗しました。ファイル形式を確認してください。"); return; }
+    const incoming = Array.isArray(parsed && parsed.artistHistory) ? parsed.artistHistory
+                    : Array.isArray(parsed) ? parsed
+                    : null;
+    if(!incoming){ alert("実績データベースのJSONとして認識できませんでした。"); return; }
+    const valid = incoming.filter(e=> e && typeof e==="object" && typeof e.artistName==="string" && typeof e._key==="string");
+    if(valid.length===0){ alert("有効な実績データが見つかりませんでした。"); return; }
+    if(!confirm(`${valid.length}件の実績データを読み込み、既存のデータベース（現在${artistHistory.length}件）にマージします。\n同じイベント・DAY・アーティスト名の組み合わせは更新日時が新しい方を採用し、それ以外は追加されます（既存データの削除は行われません）。よろしいですか？`)) return;
+    let added=0, updated=0, kept=0;
+    valid.forEach(e=>{
+      const existing = artistHistory.find(h=>h._key===e._key);
+      if(!existing){
+        artistHistory.push(Object.assign({}, e, { id: e.id || uid() }));
+        added++;
+      } else if((e.updatedAt||0) > (existing.updatedAt||0)){
+        Object.assign(existing, e, { id: existing.id });
+        updated++;
+      } else {
+        kept++;
+      }
+    });
+    saveArtistHistory();
+    renderStatsTab();
+    alert(`実績データベースを読み込みました。新規追加 ${added}件 / 更新 ${updated}件 / 変更なし ${kept}件`);
+  }
+
 
   function exportArtistHistoryCSV(){
     const rows = computeArtistHistoryAggregates().sort((a,b)=> b.audienceTotal-a.audienceTotal);
