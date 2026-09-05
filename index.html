@@ -444,14 +444,22 @@
 
     <div class="card">
       <h2>アーティスト一覧（セルを直接編集できます）</h2>
+      <p class="helptext" style="margin-top:-6px;">「DAY」「アーティスト名」「ライブ開始」「ライブ終了」「特典会開始」「特典会終了」の見出しをクリックすると、その順に並び替えられます（表示順のみの変更で、データ自体は変わりません）。</p>
       <div id="conflictBanner"></div>
       <div style="overflow-x:auto;">
         <table class="data" id="artistTable">
           <thead>
             <tr>
-              <th>DAY</th><th>色</th><th>アーティスト名</th><th>ステージ</th><th>ライブ開始</th><th>ライブ終了</th>
+              <th data-sort="dayId" data-label="DAY" style="cursor:pointer;white-space:nowrap;">DAY</th><th>色</th>
+              <th data-sort="name" data-label="アーティスト名" style="cursor:pointer;white-space:nowrap;">アーティスト名</th>
+              <th>ステージ</th>
+              <th data-sort="liveStart" data-label="ライブ開始" style="cursor:pointer;white-space:nowrap;">ライブ開始</th>
+              <th data-sort="liveEnd" data-label="ライブ終了" style="cursor:pointer;white-space:nowrap;">ライブ終了</th>
               <th>尺(分)</th><th>転換(分)</th>
-              <th>特典会場</th><th>特典会開始</th><th>特典会終了</th><th>メモ</th>
+              <th>特典会場</th>
+              <th data-sort="tokutenStart" data-label="特典会開始" style="cursor:pointer;white-space:nowrap;">特典会開始</th>
+              <th data-sort="tokutenEnd" data-label="特典会終了" style="cursor:pointer;white-space:nowrap;">特典会終了</th>
+              <th>メモ</th>
               <th class="admin-field">動員数</th><th class="admin-field">チケット売上</th><th class="admin-field">好感度</th><th></th>
             </tr>
           </thead>
@@ -544,6 +552,22 @@
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn" id="btnAddArtistMaster">＋ マスタに追加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>CSVで一括インポート／エクスポート</h2>
+      <div class="row">
+        <label class="btn secondary" style="cursor:pointer;">
+          CSVを読み込む
+          <input type="file" id="fileArtistMasterCsvImport" accept=".csv" style="display:none;">
+        </label>
+        <button class="btn secondary" id="btnArtistMasterCsvExport">現在のマスタをCSV出力</button>
+        <button class="btn ghost" id="btnArtistMasterCsvTemplate">空のテンプレートCSVをダウンロード</button>
+      </div>
+      <div class="helptext">
+        CSVの列: <b>アーティスト名, メモ</b><br>
+        同じアーティスト名（前後の空白を除いて完全一致）がすでにマスタにある場合はメモを上書き更新し、新しい名前は追加されます。事務所やマネージャーからもらった名簿CSVをそのまま読み込んだり、Excelで整理した連絡先一覧をまとめて登録する用途にお使いください。
       </div>
     </div>
 
@@ -1062,6 +1086,45 @@
     downloadBlob(lines.join("\n"), (state.event.name||"timetable")+"_artists.csv", "text/csv;charset=utf-8");
   }
 
+  // ---------- Artist master CSV import/export (simple 2-column: name + memo) ----------
+  const ARTIST_MASTER_CSV_HEADERS = ["アーティスト名","メモ"];
+  function importArtistMasterCSVText(text){
+    const rows = parseCSV(text);
+    if(rows.length===0){ alert("CSVが空です。"); return; }
+    let header = rows[0].map(h=>h.trim());
+    let startIdx = 1;
+    if(header[0] !== "アーティスト名"){ startIdx = 0; header = ARTIST_MASTER_CSV_HEADERS; }
+    const idx = {};
+    ARTIST_MASTER_CSV_HEADERS.forEach(h=>{ idx[h] = header.indexOf(h); });
+    let added = 0, updated = 0;
+    for(let r=startIdx;r<rows.length;r++){
+      const cells = rows[r];
+      if(!cells || cells.every(c=>!c || !c.trim())) continue;
+      const get = (h,fallbackPos) => {
+        const i = idx[h];
+        if(i>=0 && i<cells.length) return (cells[i]||"").trim();
+        if(fallbackPos!=null) return (cells[fallbackPos]||"").trim();
+        return "";
+      };
+      const name = get("アーティスト名",0);
+      if(!name) continue;
+      const memo = get("メモ",1);
+      const existing = artistMaster.find(m=>m.name.trim()===name);
+      if(existing){ existing.memo = memo; updated++; }
+      else { artistMaster.push({ id:uid(), name, memo, createdAt:Date.now() }); added++; }
+    }
+    saveArtistMaster();
+    renderArtistMasterTab();
+    alert(`取り込み完了：新規追加 ${added}件 / 更新 ${updated}件`);
+  }
+  function exportArtistMasterCSV(){
+    const lines = [ARTIST_MASTER_CSV_HEADERS.map(csvField).join(",")];
+    artistMaster.slice().sort((a,b)=>(a.name||"").localeCompare(b.name||"","ja")).forEach(m=>{
+      lines.push([m.name, m.memo||""].map(csvField).join(","));
+    });
+    downloadBlob(lines.join("\n"), "artist_master.csv", "text/csv;charset=utf-8");
+  }
+
   // ---------- OCR (image -> text -> artist candidates) ----------
   let ocrSelectedFile = null;
   let ocrScriptPromise = null;
@@ -1507,13 +1570,52 @@
     fillSelect(document.getElementById("afTokuten"), state.tokutenSpots, "", "（参加なし）");
   }
 
+  // ---------- Artist table sort (display order only; does not reorder state.artists) ----------
+  const ARTIST_TABLE_TIME_KEYS = new Set(["liveStart","liveEnd","tokutenStart","tokutenEnd"]);
+  let artistTableSortKey = null, artistTableSortDir = "asc";
+  function getArtistSortValue(a, key){
+    if(key==="dayId") return state.days.findIndex(d=>d.id===a.dayId);
+    if(key==="name") return a.name||"";
+    if(ARTIST_TABLE_TIME_KEYS.has(key)) return timeToMin(a[key]); // null for blank/invalid
+    return a[key];
+  }
+  function sortedArtistsForDisplay(){
+    if(!artistTableSortKey) return state.artists;
+    const key = artistTableSortKey, dir = artistTableSortDir==="asc" ? 1 : -1;
+    return state.artists.slice().sort((x,y)=>{
+      const av = getArtistSortValue(x, key), bv = getArtistSortValue(y, key);
+      const aNull = av==null || av==="", bNull = bv==null || bv==="";
+      if(aNull && bNull) return 0;
+      if(aNull) return 1; // blank/未設定は並び順に関わらず常に末尾へ
+      if(bNull) return -1;
+      if(key==="name") return dir*String(av).localeCompare(String(bv),"ja");
+      return dir*(av-bv);
+    });
+  }
+  function updateArtistTableSortHeaders(){
+    document.querySelectorAll('#artistTable thead th[data-sort]').forEach(th=>{
+      const key = th.dataset.sort;
+      const arrow = artistTableSortKey===key ? (artistTableSortDir==="asc" ? " ▲" : " ▼") : "";
+      th.textContent = th.dataset.label + arrow;
+    });
+  }
+  document.querySelectorAll('#artistTable thead th[data-sort]').forEach(th=>{
+    th.addEventListener("click", ()=>{
+      const key = th.dataset.sort;
+      if(artistTableSortKey===key){ artistTableSortDir = artistTableSortDir==="asc" ? "desc" : "asc"; }
+      else { artistTableSortKey = key; artistTableSortDir = "asc"; }
+      renderArtistTable();
+    });
+  });
+
   function renderArtistTable(){
     const liveConflicts = detectConflictsAll("live");
     const tokutenConflicts = detectConflictsAll("tokuten");
     const bufferWarningsForRows = detectBufferWarningsAll();
     const tbody = document.getElementById("artistTbody");
     tbody.innerHTML = "";
-    state.artists.forEach(a=>{
+    updateArtistTableSortHeaders();
+    sortedArtistsForDisplay().forEach(a=>{
       const tr = document.createElement("tr");
       const isConflict = liveConflicts.has(a.id) || tokutenConflicts.has(a.id);
       if(isConflict) tr.style.background = "#fde3e3";
@@ -1541,7 +1643,7 @@
           <option value="4">★★★★☆</option>
           <option value="5">★★★★★</option>
         </select></td>
-        <td><button class="del-btn" title="削除">✕</button></td>
+        <td style="white-space:nowrap;"><button class="btn ghost" data-role="addToMaster" title="このアーティストの名前とメモをマスタに登録・更新します" style="font-size:12px;padding:3px 8px;margin-right:4px;">＋マスタへ</button><button class="del-btn" title="削除">✕</button></td>
       `;
       fillDaySelect(tr.querySelector('[data-role=dayId]'), a.dayId);
       fillSelect(tr.querySelector('[data-role=stageId]'), state.stages, a.stageId, "（未定）");
@@ -1568,6 +1670,20 @@
         const idx = PALETTE.indexOf(a.color);
         a.color = PALETTE[(idx+1)%PALETTE.length];
         saveState(); renderAll();
+      });
+      tr.querySelector('[data-role="addToMaster"]').addEventListener("click", ()=>{
+        const name = (a.name||"").trim();
+        if(!name){ alert("アーティスト名が空です。先に名前を入力してください。"); return; }
+        const existing = artistMaster.find(m=>m.name.trim()===name);
+        if(existing){
+          if(!confirm(`マスタに既に「${name}」が登録されています。メモをこの行の内容（「${a.memo||"（空欄）"}」）で上書きしますか？`)) return;
+          existing.memo = a.memo||"";
+        } else {
+          artistMaster.push({ id:uid(), name, memo:a.memo||"", createdAt:Date.now() });
+        }
+        saveArtistMaster();
+        renderArtistMasterTab();
+        alert(`「${name}」をアーティストマスタに登録しました。`);
       });
       tr.querySelector(".del-btn").addEventListener("click", ()=>{
         if(!confirm(a.name+" を削除しますか？")) return;
@@ -2682,6 +2798,18 @@
   document.getElementById("btnCsvTemplate").addEventListener("click", ()=>{
     const headers = adminFieldsVisible() ? CSV_HEADERS : CSV_HEADERS.slice(0,11);
     downloadBlob(headers.map(csvField).join(",")+"\n", "artist_template.csv", "text/csv;charset=utf-8");
+  });
+
+  document.getElementById("fileArtistMasterCsvImport").addEventListener("change", e=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader();
+    reader.onload = ()=> importArtistMasterCSVText(reader.result);
+    reader.readAsText(file, "UTF-8");
+    e.target.value = "";
+  });
+  document.getElementById("btnArtistMasterCsvExport").addEventListener("click", exportArtistMasterCSV);
+  document.getElementById("btnArtistMasterCsvTemplate").addEventListener("click", ()=>{
+    downloadBlob(ARTIST_MASTER_CSV_HEADERS.map(csvField).join(",")+"\n", "artist_master_template.csv", "text/csv;charset=utf-8");
   });
 
   document.getElementById("ocrFileInput").addEventListener("change", e=>{
