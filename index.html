@@ -236,6 +236,7 @@
   <button data-tab="tokuten">⑤ 特典会TT</button>
   <button data-tab="output">⑥ PDF出力</button>
   <button data-tab="stats" class="admin-field">⑦ 実績集計</button>
+  <button data-tab="master">⑧ アーティストマスタ</button>
   <button data-tab="clock" class="clock-tab">現在時刻</button>
 </nav>
 
@@ -523,6 +524,34 @@
     <div id="statsTabWrap"></div>
   </div>
 
+  <!-- ============ TAB: ARTIST MASTER ============ -->
+  <div class="tabcontent" id="tab-master">
+    <div class="card">
+      <h2>アーティストマスタ</h2>
+      <p class="helptext">
+        イベントをまたいで使う「よく呼ぶアーティストの名簿」です。ここに登録しておくと、新しいイベントを作るたびに名前や連絡先を入力し直さずに、一覧からチェックを入れるだけでその回のアーティスト一覧に追加（ブッキング）できます。<br>
+        このマスタは現在のイベントデータ（「全データ削除」で消える範囲）とは別に保存されるため、イベントを作り直しても消えません。
+      </p>
+      <div class="grid cols2">
+        <div>
+          <label>アーティスト名</label>
+          <input type="text" id="amName" placeholder="例：サンプル☆ガールズ">
+        </div>
+        <div>
+          <label>メモ（連絡先・事務所名など）</label>
+          <input type="text" id="amMemo" placeholder="例：〇〇プロダクション／担当：△△様 090-xxxx-xxxx">
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn" id="btnAddArtistMaster">＋ マスタに追加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="artistMasterWrap"></div>
+    </div>
+  </div>
+
   <!-- ============ TAB: LIVE CLOCK ============ -->
   <div class="tabcontent" id="tab-clock">
     <div class="card" style="text-align:center;">
@@ -548,6 +577,7 @@
   const STORAGE_KEY = "idolfes_timetable_v2";
   const STORAGE_KEY_V1 = "idolfes_timetable_v1";
   const ARTIST_HISTORY_KEY = "cuefes_artist_history_v1";
+  const ARTIST_MASTER_KEY = "cuefes_artist_master_v1";
   const PALETTE = ["#ffb3c6","#b3e5ff","#c8f7c5","#ffe3a3","#d9b3ff","#ffc9de","#a3f0e0",
                     "#ffd6a3","#b3c6ff","#f7c5e0","#c5e8f7","#e0f7c5"];
   const PRINT_HEIGHT_BUDGET = 940; // px budget for one A4 portrait page content height
@@ -702,8 +732,27 @@
     syncArtistHistoryFromCurrentEvent();
   }
 
+  // ---------- Artist master (persistent, cross-event roster for quick booking) ----------
+  // Independent of `state` (not cleared by "全データ削除") and independent of
+  // artistHistory (which tracks per-event performance numbers, not a name+memo
+  // roster meant for reuse). Kept deliberately simple: name + a free-text memo
+  // for contact/agency info, since that's what's needed to pick artists off a
+  // list and book them into a new event without retyping.
+  function loadArtistMaster(){
+    try{
+      const raw = localStorage.getItem(ARTIST_MASTER_KEY);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        if(Array.isArray(parsed)) return parsed;
+      }
+    }catch(e){ /* fall through */ }
+    return [];
+  }
+  function saveArtistMaster(){ localStorage.setItem(ARTIST_MASTER_KEY, JSON.stringify(artistMaster)); }
+
   let state = loadState();
   let artistHistory = loadArtistHistory();
+  let artistMaster = loadArtistMaster();
 
   // ---------- Admin-only visibility (動員数/チケット売上/イベンター好感度) ----------
   // This is a lightweight, client-side-only view gate — not real security (all
@@ -788,7 +837,11 @@
 
   // ---------- 尺(duration) <-> ライブ開始/終了 two-way sync ----------
   // Editing duration recomputes liveEnd from liveStart+duration.
-  // Editing liveStart/liveEnd directly recomputes the displayed duration to match.
+  // Editing liveStart directly (with a duration already set) keeps that
+  // duration fixed and shifts liveEnd to match, so nudging a start time
+  // doesn't silently change how long the set is. Editing liveEnd directly
+  // (or liveStart when no duration is set yet) instead recomputes the
+  // displayed duration from the start/end gap.
   function syncDurationFromTimes(a){
     if(isValidTime(a.liveStart) && isValidTime(a.liveEnd)){
       const diff = timeToMin(a.liveEnd) - timeToMin(a.liveStart);
@@ -799,6 +852,18 @@
     const dur = parseInt(a.durationMin, 10);
     if(isValidTime(a.liveStart) && !isNaN(dur) && dur > 0){
       a.liveEnd = minToTime(timeToMin(a.liveStart) + dur);
+    }
+  }
+  // Called after the user edits a live-time field. role is "liveStart",
+  // "liveEnd", "tokutenStart" or "tokutenEnd" (the latter two have no
+  // duration concept and just pass through to syncDurationFromTimes, which
+  // no-ops for them since it only reads liveStart/liveEnd).
+  function onLiveTimeFieldEdited(a, role){
+    const dur = parseInt(a.durationMin, 10);
+    if(role==="liveStart" && isValidTime(a.liveStart) && !isNaN(dur) && dur>0){
+      syncEndFromDuration(a);
+    } else {
+      syncDurationFromTimes(a);
     }
   }
 
@@ -1357,6 +1422,82 @@
     sel.innerHTML = state.days.map(d=>`<option value="${d.id}" ${d.id===currentId?"selected":""}>${escapeHtml(d.label)}</option>`).join("");
   }
 
+  // ---------- Rendering: artist master tab ----------
+  function renderArtistMasterTab(){
+    const wrap = document.getElementById("artistMasterWrap");
+    if(!wrap) return;
+    const rows = artistMaster.slice().sort((x,y)=> (x.name||"").localeCompare(y.name||"", "ja"));
+    if(rows.length===0){
+      wrap.innerHTML = `<div class="helptext">まだマスタにアーティストが登録されていません。上のフォームから追加してください。</div>`;
+      return;
+    }
+    wrap.innerHTML = `
+      <div class="row" style="justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px;">
+        <div class="helptext" style="margin:0;">全${rows.length}組。チェックを入れて、下のボタンで今のイベントに追加できます。</div>
+        <div class="row" style="align-items:center;">
+          <label style="margin:0;white-space:nowrap;">追加先DAY</label>
+          <select id="amTargetDay" style="width:auto;"></select>
+          <button class="btn" id="btnAmBookSelected">✓ 選択したアーティストを今のイベントに追加</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;">
+        <table class="data" id="artistMasterTable">
+          <thead><tr><th style="width:32px;"></th><th>アーティスト名</th><th>メモ（連絡先・事務所名など）</th><th style="width:40px;"></th></tr></thead>
+          <tbody>
+            ${rows.map(m=>`
+              <tr data-id="${m.id}">
+                <td><input type="checkbox" data-role="amCheck"></td>
+                <td><input type="text" data-role="amRowName" value="${escapeAttr(m.name)}"></td>
+                <td><input type="text" data-role="amRowMemo" value="${escapeAttr(m.memo||"")}"></td>
+                <td><button class="del-btn" data-role="amRowDelete" title="マスタから削除">✕</button></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+
+    fillDaySelect(document.getElementById("amTargetDay"), state.days[0].id);
+
+    wrap.querySelectorAll("tbody tr").forEach(tr=>{
+      const id = tr.dataset.id;
+      const m = artistMaster.find(x=>x.id===id);
+      if(!m) return;
+      tr.querySelector('[data-role=amRowName]').addEventListener("change", e=>{
+        m.name = e.target.value.trim();
+        saveArtistMaster();
+        renderArtistMasterTab();
+      });
+      tr.querySelector('[data-role=amRowMemo]').addEventListener("change", e=>{
+        m.memo = e.target.value.trim();
+        saveArtistMaster();
+      });
+      tr.querySelector('[data-role=amRowDelete]').addEventListener("click", ()=>{
+        if(!confirm(`「${m.name}」をマスタから削除します。よろしいですか？（現在のイベントに追加済みのデータには影響しません）`)) return;
+        artistMaster = artistMaster.filter(x=>x.id!==id);
+        saveArtistMaster();
+        renderArtistMasterTab();
+      });
+    });
+
+    document.getElementById("btnAmBookSelected").addEventListener("click", ()=>{
+      const checkedIds = Array.from(wrap.querySelectorAll('tbody tr')).filter(tr=>tr.querySelector('[data-role=amCheck]').checked).map(tr=>tr.dataset.id);
+      if(checkedIds.length===0){ alert("追加するアーティストにチェックを入れてください。"); return; }
+      const dayId = document.getElementById("amTargetDay").value || state.days[0].id;
+      checkedIds.forEach(id=>{
+        const m = artistMaster.find(x=>x.id===id);
+        if(!m) return;
+        state.artists.push({
+          id:uid(), name:m.name, color: colorForIndex(state.artists.length),
+          dayId, stageId:"", liveStart:"", liveEnd:"", durationMin:"", changeoverMin:"",
+          tokutenSpotId:"", tokutenStart:"", tokutenEnd:"", memo:m.memo||"",
+          audience:"", ticketSales:"", favorability:""
+        });
+      });
+      saveState();
+      renderAll();
+      alert(`${checkedIds.length}組のアーティストを、今のイベントの「${byId(state.days,dayId).label}」に追加しました。ステージや時刻は「③アーティスト管理」または④⑤のタイムテーブル上で設定してください。`);
+    });
+  }
+
   // ---------- Rendering: artist form + table ----------
   function renderArtistForm(){
     const afDay = document.getElementById("afDay");
@@ -1421,7 +1562,7 @@
         });
       });
       timeRoles.forEach(role=>{
-        wireTimeField(tr, role, v=>{ a[role]=v; syncDurationFromTimes(a); saveState(); renderAll(); });
+        wireTimeField(tr, role, v=>{ a[role]=v; onLiveTimeFieldEdited(a, role); saveState(); renderAll(); });
       });
       tr.querySelector('[data-role=color]').addEventListener("click", ()=>{
         const idx = PALETTE.indexOf(a.color);
@@ -2301,6 +2442,7 @@
     renderPrintStyleControls();
     renderStatsTab();
     renderArtistNameList();
+    renderArtistMasterTab();
     updateClock();
     applyAdminVisibility();
     document.title = (state.event.name?state.event.name+" - ":"")+"CueFes";
@@ -2461,6 +2603,17 @@
     inp.value=""; saveState(); renderAll();
   });
 
+  document.getElementById("btnAddArtistMaster").addEventListener("click", ()=>{
+    const nameInp = document.getElementById("amName");
+    const memoInp = document.getElementById("amMemo");
+    const name = nameInp.value.trim();
+    if(!name){ alert("アーティスト名を入力してください"); return; }
+    artistMaster.push({ id:uid(), name, memo: memoInp.value.trim(), createdAt: Date.now() });
+    saveArtistMaster();
+    nameInp.value = ""; memoInp.value = "";
+    renderArtistMasterTab();
+  });
+
   // 尺(分) drives ライブ終了 automatically: typing/adjusting duration recomputes
   // the end time from the current start time. Changing the start time (while a
   // duration is set) keeps the duration fixed and shifts the end time with it.
@@ -2572,7 +2725,7 @@
   document.getElementById("btnOcrCommit").addEventListener("click", ocrCommitRows);
 
   document.getElementById("btnBackupExport").addEventListener("click", ()=>{
-    downloadBlob(JSON.stringify({ formatVersion:2, state, artistHistory }, null, 2), (state.event.name||"timetable")+"_backup.json", "application/json");
+    downloadBlob(JSON.stringify({ formatVersion:2, state, artistHistory, artistMaster }, null, 2), (state.event.name||"timetable")+"_backup.json", "application/json");
   });
   document.getElementById("fileBackupImport").addEventListener("change", e=>{
     const file = e.target.files[0]; if(!file) return;
@@ -2580,24 +2733,28 @@
     reader.onload = ()=>{
       try{
         const parsed = JSON.parse(reader.result);
-        let newState = null, newHistory = null;
+        let newState = null, newHistory = null, newMaster = null;
         if(parsed.state && parsed.state.days && parsed.state.stages && parsed.state.artists){
-          // current backup format: { state, artistHistory }
+          // current backup format: { state, artistHistory, artistMaster }
           newState = parsed.state;
           if(Array.isArray(parsed.artistHistory)) newHistory = parsed.artistHistory;
+          if(Array.isArray(parsed.artistMaster)) newMaster = parsed.artistMaster;
         } else if(parsed.days && parsed.stages && parsed.artists){
-          // older backup format: bare state object (no artist history database yet)
+          // older backup format: bare state object (no artist history/master database yet)
           newState = parsed;
         } else {
           throw new Error("invalid");
         }
         let msg = "現在のイベントデータを上書きします。よろしいですか？";
         if(newHistory) msg += "\nアーティスト実績データベース（通算実績）も、このファイルの内容で上書きされます。";
+        if(newMaster) msg += "\nアーティストマスタも、このファイルの内容で上書きされます。";
         if(!confirm(msg)) return;
         state = normalizePrintStyle(newState);
         if(newHistory) artistHistory = newHistory;
+        if(newMaster) artistMaster = newMaster;
         saveState();
         if(newHistory) saveArtistHistory();
+        if(newMaster) saveArtistMaster();
         renderAll();
       }catch(err){ alert("バックアップファイルの読み込みに失敗しました。"); }
     };
