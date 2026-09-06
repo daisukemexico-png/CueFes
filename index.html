@@ -237,6 +237,7 @@
   <button data-tab="output">⑥ PDF出力</button>
   <button data-tab="stats" class="admin-field">⑦ 実績集計</button>
   <button data-tab="master">⑧ アーティストマスタ</button>
+  <button data-tab="contactsheet">⑨ 出演者連絡シート</button>
   <button data-tab="clock" class="clock-tab">現在時刻</button>
 </nav>
 
@@ -275,6 +276,16 @@
       <div class="row" style="margin-top:10px;">
         <input type="text" id="newTokutenName" placeholder="新しい特典会場名（例: 特典会場3）" style="width:220px;">
         <button class="btn" id="btnAddTokuten">＋ 特典会場を追加</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>楽屋管理（出演者連絡シート用・全DAY共通）</h2>
+      <p class="helptext">「⑨ 出演者連絡シート」でマネージャー様宛の連絡文を作る際に使う、楽屋の名前一覧です。複数のアーティストで同じ楽屋を共有する場合も、ここで一括管理できます。</p>
+      <div class="chip-list" id="greenRoomChips"></div>
+      <div class="row" style="margin-top:10px;">
+        <input type="text" id="newGreenRoomName" placeholder="新しい楽屋名（例: 第2楽屋）" style="width:220px;">
+        <button class="btn" id="btnAddGreenRoom">＋ 楽屋を追加</button>
       </div>
     </div>
   </div>
@@ -420,6 +431,9 @@
         <div><label>特典会終了</label><span class="timefield"><input type="time" step="300" data-role="afTokutenEnd"><label class="timefield-late"><input type="checkbox" data-role="afTokutenEnd_late">翌日</label></span></div>
         <div><label>尺（分）</label><span class="durfield"><input type="number" id="afDuration" min="0" step="5" placeholder="20"><span>分→終了を自動計算</span></span></div>
         <div><label>転換/バッファ（分）</label><span class="durfield"><input type="number" id="afChangeover" min="0" step="5" placeholder="5"><span>分（次の枠まで）</span></span></div>
+        <div><label>特典会尺（分）</label><span class="durfield"><input type="number" id="afTokutenDuration" min="0" step="5" placeholder="20"><span>分→特典会終了を自動計算</span></span></div>
+        <div><label>楽屋</label><select id="afGreenRoom"></select></div>
+        <div><label>入り時間</label><span class="timefield"><input type="time" step="300" data-role="afCallTime"><label class="timefield-late"><input type="checkbox" data-role="afCallTime_late">翌日</label></span></div>
         <div class="admin-field"><label>動員数</label><input type="number" id="afAudience" min="0" step="1" placeholder="人数"></div>
         <div class="admin-field"><label>チケット売上（円）</label><input type="number" id="afTicketSales" min="0" step="100" placeholder="円"></div>
         <div class="admin-field"><label>イベンター好感度</label>
@@ -444,7 +458,7 @@
 
     <div class="card">
       <h2>アーティスト一覧（セルを直接編集できます）</h2>
-      <p class="helptext" style="margin-top:-6px;">「DAY」「アーティスト名」「ライブ開始」「ライブ終了」「特典会開始」「特典会終了」の見出しをクリックすると、その順に並び替えられます（表示順のみの変更で、データ自体は変わりません）。</p>
+      <p class="helptext" style="margin-top:-6px;">「DAY」「アーティスト名」「ライブ開始」「ライブ終了」「特典会開始」「特典会終了」「入り時間」の見出しをクリックすると、その順に並び替えられます（表示順のみの変更で、データ自体は変わりません）。</p>
       <div id="conflictBanner"></div>
       <div style="overflow-x:auto;">
         <table class="data" id="artistTable">
@@ -459,6 +473,9 @@
               <th>特典会場</th>
               <th data-sort="tokutenStart" data-label="特典会開始" style="cursor:pointer;white-space:nowrap;">特典会開始</th>
               <th data-sort="tokutenEnd" data-label="特典会終了" style="cursor:pointer;white-space:nowrap;">特典会終了</th>
+              <th>特典会尺(分)</th>
+              <th>楽屋</th>
+              <th data-sort="callTime" data-label="入り時間" style="cursor:pointer;white-space:nowrap;">入り時間</th>
               <th>メモ</th>
               <th class="admin-field">動員数</th><th class="admin-field">チケット売上</th><th class="admin-field">好感度</th><th></th>
             </tr>
@@ -576,6 +593,48 @@
     </div>
   </div>
 
+  <!-- ============ TAB: CONTACT SHEET (per-artist notice for managers) ============ -->
+  <div class="tabcontent" id="tab-contactsheet">
+    <div class="card">
+      <h2>出演者連絡シート</h2>
+      <p class="helptext">
+        楽屋場所・入り時間・出演（ライブ）時間・物販/特典会時間をまとめた、マネージャー様向けの連絡文をアーティスト1組ずつ作成できます。DAYとアーティストを選ぶと下に文面がたたき台として自動生成されるので、内容を確認・編集してからPDF出力やメール送信にお使いください。
+      </p>
+      <div class="grid cols2">
+        <div>
+          <label>DAY</label>
+          <select id="csDay"></select>
+        </div>
+        <div>
+          <label>アーティスト</label>
+          <select id="csArtist"></select>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn secondary" id="btnCsRegenerate">たたき台を作り直す</button>
+      </div>
+      <div class="helptext" id="csEmptyMsg" style="display:none;margin-top:10px;">このDAYにはまだアーティストが登録されていません。「③アーティスト管理」から追加してください。</div>
+    </div>
+
+    <div class="card" id="csEditorCard" style="display:none;">
+      <h2>連絡文（編集できます）</h2>
+      <label>件名</label>
+      <input type="text" id="csSubject" style="margin-bottom:10px;">
+      <label>本文</label>
+      <textarea id="csBody" rows="14" style="font-family:inherit;"></textarea>
+      <div class="row" style="margin-top:12px;flex-wrap:wrap;">
+        <button class="btn" id="btnCsPdf">PDFで出力する</button>
+        <button class="btn secondary" id="btnCsMailto">メールソフトを起動する</button>
+        <button class="btn ghost" id="btnCsCopy">本文をコピーする</button>
+      </div>
+      <div class="helptext" id="csCopyStatus" style="margin-top:6px;"></div>
+      <div class="helptext" style="margin-top:10px;">
+        「メールソフトを起動する」は、お使いのパソコン・スマートフォンに設定されている既定のメールアプリを、件名・本文を入力した状態で開きます（宛先はご自身で入力してください。このアプリは連絡先を保存しないため宛先の自動入力はできません）。Gmail等をブラウザで開いて使っている場合は、代わりに「本文をコピーする」でコピーしてから貼り付けてください。<br>
+        本文中の時刻・楽屋などは、上のたたき台作成時点の内容がそのままテキストとして入っています。タイムテーブル側を後から変更した場合は、「たたき台を作り直す」を押すか、この欄を直接編集してください。
+      </div>
+    </div>
+  </div>
+
   <!-- ============ TAB: LIVE CLOCK ============ -->
   <div class="tabcontent" id="tab-clock">
     <div class="card" style="text-align:center;">
@@ -632,10 +691,11 @@
   ];
   const DEFAULT_PRINT_STYLE = Object.assign({ preset:"default", pngTransparentBg:true }, PRINT_STYLE_PRESETS[0].values);
   function clonePrintStyle(s){ return JSON.parse(JSON.stringify(s)); }
-  // Fills in a valid printStyle on any state object that may predate this
-  // feature (older localStorage data / older backup files), without touching
-  // an already-valid one, so upgrading never resets a user's chosen colors.
+  // Fills in fields that may be missing from older localStorage data / older
+  // backup files (printStyle, greenRooms, etc.), without touching any that
+  // are already present, so upgrading never resets existing user data.
   function normalizePrintStyle(s){
+    if(!Array.isArray(s.greenRooms)) s.greenRooms = [];
     if(!s.printStyle || typeof s.printStyle!=="object"){
       s.printStyle = clonePrintStyle(DEFAULT_PRINT_STYLE);
       return s;
@@ -662,6 +722,7 @@
       days:[ makeDefaultDay(1) ],
       stages:[ {id:uid(), name:"Aステージ"}, {id:uid(), name:"Bステージ"} ],
       tokutenSpots:[ {id:uid(), name:"特典会場1"}, {id:uid(), name:"特典会場2"} ],
+      greenRooms:[],
       artists:[],
       printStyle: clonePrintStyle(DEFAULT_PRINT_STYLE)
     };
@@ -859,35 +920,45 @@
     late.addEventListener("change", handler);
   }
 
-  // ---------- 尺(duration) <-> ライブ開始/終了 two-way sync ----------
-  // Editing duration recomputes liveEnd from liveStart+duration.
-  // Editing liveStart directly (with a duration already set) keeps that
-  // duration fixed and shifts liveEnd to match, so nudging a start time
-  // doesn't silently change how long the set is. Editing liveEnd directly
-  // (or liveStart when no duration is set yet) instead recomputes the
+  // ---------- 尺(duration) <-> ライブ/特典会 開始・終了 two-way sync ----------
+  // Editing duration recomputes end from start+duration.
+  // Editing start directly (with a duration already set) keeps that
+  // duration fixed and shifts end to match, so nudging a start time
+  // doesn't silently change how long the set/枠 is. Editing end directly
+  // (or start when no duration is set yet) instead recomputes the
   // displayed duration from the start/end gap.
-  function syncDurationFromTimes(a){
-    if(isValidTime(a.liveStart) && isValidTime(a.liveEnd)){
-      const diff = timeToMin(a.liveEnd) - timeToMin(a.liveStart);
-      if(diff >= 0) a.durationMin = String(diff);
+  // kind is "live" or "tokuten"; both share the exact same logic, just
+  // reading/writing a different trio of fields (durationMin/liveStart/liveEnd
+  // vs tokutenDurationMin/tokutenStart/tokutenEnd).
+  function durationFieldsFor(kind){
+    return kind==="tokuten"
+      ? { startKey:"tokutenStart", endKey:"tokutenEnd", durKey:"tokutenDurationMin" }
+      : { startKey:"liveStart", endKey:"liveEnd", durKey:"durationMin" };
+  }
+  function syncDurationFromTimes(a, kind){
+    const {startKey, endKey, durKey} = durationFieldsFor(kind);
+    if(isValidTime(a[startKey]) && isValidTime(a[endKey])){
+      const diff = timeToMin(a[endKey]) - timeToMin(a[startKey]);
+      if(diff >= 0) a[durKey] = String(diff);
     }
   }
-  function syncEndFromDuration(a){
-    const dur = parseInt(a.durationMin, 10);
-    if(isValidTime(a.liveStart) && !isNaN(dur) && dur > 0){
-      a.liveEnd = minToTime(timeToMin(a.liveStart) + dur);
+  function syncEndFromDuration(a, kind){
+    const {startKey, endKey, durKey} = durationFieldsFor(kind);
+    const dur = parseInt(a[durKey], 10);
+    if(isValidTime(a[startKey]) && !isNaN(dur) && dur > 0){
+      a[endKey] = minToTime(timeToMin(a[startKey]) + dur);
     }
   }
-  // Called after the user edits a live-time field. role is "liveStart",
-  // "liveEnd", "tokutenStart" or "tokutenEnd" (the latter two have no
-  // duration concept and just pass through to syncDurationFromTimes, which
-  // no-ops for them since it only reads liveStart/liveEnd).
+  // Called after the user edits a start/end time field. role is one of
+  // "liveStart", "liveEnd", "tokutenStart", "tokutenEnd".
   function onLiveTimeFieldEdited(a, role){
-    const dur = parseInt(a.durationMin, 10);
-    if(role==="liveStart" && isValidTime(a.liveStart) && !isNaN(dur) && dur>0){
-      syncEndFromDuration(a);
+    const kind = (role==="tokutenStart" || role==="tokutenEnd") ? "tokuten" : "live";
+    const {startKey, durKey} = durationFieldsFor(kind);
+    const dur = parseInt(a[durKey], 10);
+    if(role===startKey && isValidTime(a[startKey]) && !isNaN(dur) && dur>0){
+      syncEndFromDuration(a, kind);
     } else {
-      syncDurationFromTimes(a);
+      syncDurationFromTimes(a, kind);
     }
   }
 
@@ -912,6 +983,13 @@
     if(!s){ s={id:uid(), name}; state.tokutenSpots.push(s); }
     return s.id;
   }
+  function findOrCreateGreenRoom(name){
+    name=(name||"").trim(); if(!name) return "";
+    let s = state.greenRooms.find(x=>x.name===name);
+    if(!s){ s={id:uid(), name}; state.greenRooms.push(s); }
+    return s.id;
+  }
+  function greenRoomName(id){ const g = byId(state.greenRooms, id); return g ? g.name : ""; }
   function findOrCreateDay(label){
     label=(label||"").trim();
     if(!label) return state.days[0].id;
@@ -981,7 +1059,7 @@
     return v;
   }
 
-  const CSV_HEADERS = ["DAY","アーティスト名","ステージ","ライブ開始","ライブ終了","尺(分)","転換(分)","特典会場","特典会開始","特典会終了","メモ","動員数","チケット売上","イベンター好感度"];
+  const CSV_HEADERS = ["DAY","アーティスト名","ステージ","ライブ開始","ライブ終了","尺(分)","転換(分)","特典会場","特典会開始","特典会終了","特典会尺(分)","楽屋","入り時間","メモ","動員数","チケット売上","イベンター好感度"];
 
   function importCSVText(text, mode){
     mode = mode || "upsert"; // "upsert" | "append"
@@ -1013,10 +1091,13 @@
       const tokutenNm = get("特典会場",7);
       const tokutenStart = get("特典会開始",8);
       const tokutenEnd = get("特典会終了",9);
-      const memo = get("メモ",10);
-      const audienceNm = get("動員数",11);
-      const ticketSalesNm = get("チケット売上",12);
-      const favorabilityNm = get("イベンター好感度",13);
+      const tokutenDurationNm = get("特典会尺(分)",10);
+      const greenRoomNm = get("楽屋",11);
+      const callTimeNm = get("入り時間",12);
+      const memo = get("メモ",13);
+      const audienceNm = get("動員数",14);
+      const ticketSalesNm = get("チケット売上",15);
+      const favorabilityNm = get("イベンター好感度",16);
       const dayId = findOrCreateDay(dayNm);
 
       liveStart = isValidTime(liveStart) ? liveStart : "";
@@ -1026,6 +1107,12 @@
       if(!liveEnd && liveStart && !isNaN(durMin) && durMin>0){
         liveEnd = minToTime(timeToMin(liveStart)+durMin);
       }
+      let tokutenStartV = isValidTime(tokutenStart) ? tokutenStart : "";
+      let tokutenEndV = isValidTime(tokutenEnd) ? tokutenEnd : "";
+      const tokDurMin = parseInt(tokutenDurationNm,10);
+      if(!tokutenEndV && tokutenStartV && !isNaN(tokDurMin) && tokDurMin>0){
+        tokutenEndV = minToTime(timeToMin(tokutenStartV)+tokDurMin);
+      }
 
       const fields = {
         name,
@@ -1034,7 +1121,10 @@
         durationMin: !isNaN(durMin) ? String(durMin) : (liveStart && liveEnd ? String(timeToMin(liveEnd)-timeToMin(liveStart)) : ""),
         changeoverMin: /^[0-9]+$/.test(changeoverNm) ? changeoverNm : "",
         tokutenSpotId: tokutenNm ? findOrCreateTokuten(tokutenNm) : "",
-        tokutenStart: isValidTime(tokutenStart)?tokutenStart:"", tokutenEnd: isValidTime(tokutenEnd)?tokutenEnd:"",
+        tokutenStart: tokutenStartV, tokutenEnd: tokutenEndV,
+        tokutenDurationMin: !isNaN(tokDurMin) ? String(tokDurMin) : (tokutenStartV && tokutenEndV ? String(timeToMin(tokutenEndV)-timeToMin(tokutenStartV)) : ""),
+        greenRoomId: greenRoomNm ? findOrCreateGreenRoom(greenRoomNm) : "",
+        callTime: isValidTime(callTimeNm) ? callTimeNm : "",
         memo
       };
       // 動員数/チケット売上/イベンター好感度は管理者専用項目のため、ロック中は
@@ -1072,13 +1162,14 @@
 
   function exportCSV(){
     const showAdmin = adminFieldsVisible();
-    const headers = showAdmin ? CSV_HEADERS : CSV_HEADERS.slice(0,11);
+    const headers = showAdmin ? CSV_HEADERS : CSV_HEADERS.slice(0,14);
     const lines = [headers.map(csvField).join(",")];
     state.artists.forEach(a=>{
       const row = [
         dayLabel(a.dayId), a.name, stageName(a.stageId), a.liveStart||"", a.liveEnd||"",
         a.durationMin||"", a.changeoverMin||"",
-        tokutenName(a.tokutenSpotId), a.tokutenStart||"", a.tokutenEnd||"", a.memo||""
+        tokutenName(a.tokutenSpotId), a.tokutenStart||"", a.tokutenEnd||"", a.tokutenDurationMin||"",
+        greenRoomName(a.greenRoomId), a.callTime||"", a.memo||""
       ];
       if(showAdmin) row.push(a.audience||"", a.ticketSales||"", a.favorability||"");
       lines.push(row.map(csvField).join(","));
@@ -1315,16 +1406,16 @@
       const laneId = laneText ? (target==="live" ? findOrCreateStage(laneText) : findOrCreateTokuten(laneText)) : "";
       let existing = state.artists.find(a=>a.dayId===dayId && a.name.trim()===name);
       if(existing){
-        if(target==="live"){ if(laneId) existing.stageId=laneId; existing.liveStart=start; existing.liveEnd=end; syncDurationFromTimes(existing); }
-        else { if(laneId) existing.tokutenSpotId=laneId; existing.tokutenStart=start; existing.tokutenEnd=end; }
+        if(target==="live"){ if(laneId) existing.stageId=laneId; existing.liveStart=start; existing.liveEnd=end; syncDurationFromTimes(existing, "live"); }
+        else { if(laneId) existing.tokutenSpotId=laneId; existing.tokutenStart=start; existing.tokutenEnd=end; syncDurationFromTimes(existing, "tokuten"); }
         updated++;
       } else {
         const obj = { id:uid(), name, color:colorForIndex(state.artists.length), dayId,
           stageId:"", liveStart:"", liveEnd:"", durationMin:"", changeoverMin:"",
-          tokutenSpotId:"", tokutenStart:"", tokutenEnd:"", memo:"",
+          tokutenSpotId:"", tokutenStart:"", tokutenEnd:"", tokutenDurationMin:"", greenRoomId:"", callTime:"", memo:"",
           audience:"", ticketSales:"", favorability:"" };
-        if(target==="live"){ obj.stageId=laneId; obj.liveStart=start; obj.liveEnd=end; syncDurationFromTimes(obj); }
-        else { obj.tokutenSpotId=laneId; obj.tokutenStart=start; obj.tokutenEnd=end; }
+        if(target==="live"){ obj.stageId=laneId; obj.liveStart=start; obj.liveEnd=end; syncDurationFromTimes(obj, "live"); }
+        else { obj.tokutenSpotId=laneId; obj.tokutenStart=start; obj.tokutenEnd=end; syncDurationFromTimes(obj, "tokuten"); }
         state.artists.push(obj);
         added++;
       }
@@ -1442,6 +1533,21 @@
       });
       tokutenChips.appendChild(chip);
     });
+
+    const greenRoomChips = document.getElementById("greenRoomChips");
+    greenRoomChips.innerHTML = "";
+    state.greenRooms.forEach(s=>{
+      const chip = document.createElement("div"); chip.className="chip";
+      chip.innerHTML = `<input type="text" value="${escapeAttr(s.name)}"><button title="削除">✕</button>`;
+      chip.querySelector("input").addEventListener("change", e=>{ s.name=e.target.value.trim()||s.name; saveState(); renderAll(); });
+      chip.querySelector("button").addEventListener("click", ()=>{
+        if(state.artists.some(a=>a.greenRoomId===s.id) && !confirm("この楽屋を使用しているアーティストがいます。削除すると割当が解除されます。よろしいですか？")) return;
+        state.greenRooms = state.greenRooms.filter(x=>x.id!==s.id);
+        state.artists.forEach(a=>{ if(a.greenRoomId===s.id) a.greenRoomId=""; });
+        saveState(); renderAll();
+      });
+      greenRoomChips.appendChild(chip);
+    });
   }
 
   function renderDayCards(){
@@ -1486,6 +1592,127 @@
   }
 
   // ---------- Rendering: artist master tab ----------
+  // ---------- Contact sheet (per-artist notice for the manager) ----------
+  // Builds a plain-text subject/body draft summarizing everything a manager
+  // needs for one artist on one DAY: dressing room, call time, live slot
+  // (with duration), and tokuten slot (with duration). Kept as plain text
+  // (not the print-styled gantt) since it's meant to be copy/pasted into an
+  // email or a simple printed handout, not a branded timetable page.
+  function buildContactSheetContent(a, day){
+    const evName = state.event.name || "（イベント名未設定）";
+    const dayInfo = day.label + (day.date ? "（"+day.date+"）" : "");
+    const stageNm = stageName(a.stageId) || "（未定）";
+    const tokutenNm = tokutenName(a.tokutenSpotId) || "（未定）";
+    const greenRoomNm = greenRoomName(a.greenRoomId) || "（未定）";
+    const liveInfo = (isValidTime(a.liveStart) && isValidTime(a.liveEnd))
+      ? `${a.liveStart}〜${a.liveEnd}（${stageNm}${a.durationMin?"／尺"+a.durationMin+"分":""}）`
+      : "（未定）";
+    const tokutenInfo = (isValidTime(a.tokutenStart) && isValidTime(a.tokutenEnd))
+      ? `${a.tokutenStart}〜${a.tokutenEnd}（${tokutenNm}${a.tokutenDurationMin?"／尺"+a.tokutenDurationMin+"分":""}）`
+      : "（未定）";
+    const callInfo = isValidTime(a.callTime) ? a.callTime : "（未定）";
+    const subject = `【${evName}】${dayInfo} 出演スケジュールのご案内（${a.name}）`;
+    const body = [
+      `${a.name} ご担当者様`,
+      ``,
+      `いつもお世話になっております。${evName} 運営事務局です。`,
+      `${dayInfo} の出演スケジュールをご案内いたします。`,
+      ``,
+      `【アーティスト名】${a.name} 様`,
+      `【会場】${state.event.venue || "（未定）"}`,
+      `【楽屋】${greenRoomNm}`,
+      `【入り時間】${callInfo}`,
+      `【出演（ライブ）】${liveInfo}`,
+      `【物販/特典会】${tokutenInfo}`,
+      ``,
+      `ご不明点がございましたら、お気軽にお問い合わせください。`,
+      `よろしくお願いいたします。`,
+      ``,
+      `${evName} 運営事務局`
+    ].join("\n");
+    return {subject, body};
+  }
+
+  function regenerateContactSheet(){
+    const daySel = document.getElementById("csDay");
+    const artistSel = document.getElementById("csArtist");
+    if(!daySel || !artistSel) return;
+    const day = byId(state.days, daySel.value);
+    const artist = byId(state.artists, artistSel.value);
+    if(!day || !artist) return;
+    const {subject, body} = buildContactSheetContent(artist, day);
+    document.getElementById("csSubject").value = subject;
+    document.getElementById("csBody").value = body;
+    const status = document.getElementById("csCopyStatus");
+    if(status) status.textContent = "";
+  }
+
+  function renderContactSheetTab(){
+    const daySel = document.getElementById("csDay");
+    const artistSel = document.getElementById("csArtist");
+    if(!daySel || !artistSel) return;
+    const keepDay = daySel.value && state.days.some(d=>d.id===daySel.value) ? daySel.value : state.days[0].id;
+    fillDaySelect(daySel, keepDay);
+
+    const dayArtists = state.artists.filter(a=>a.dayId===keepDay).slice().sort((x,y)=>(x.name||"").localeCompare(y.name||"","ja"));
+    const keepArtist = artistSel.value && dayArtists.some(a=>a.id===artistSel.value) ? artistSel.value : (dayArtists[0] ? dayArtists[0].id : "");
+    artistSel.innerHTML = dayArtists.map(a=>`<option value="${a.id}" ${a.id===keepArtist?"selected":""}>${escapeHtml(a.name)}</option>`).join("");
+
+    const emptyMsg = document.getElementById("csEmptyMsg");
+    const editorCard = document.getElementById("csEditorCard");
+    if(dayArtists.length===0){
+      emptyMsg.style.display = "block";
+      editorCard.style.display = "none";
+      return;
+    }
+    emptyMsg.style.display = "none";
+    editorCard.style.display = "block";
+    // Auto-fill a first draft only while the box is still empty, so this
+    // never silently overwrites text the user is in the middle of editing.
+    if(!document.getElementById("csBody").value.trim()) regenerateContactSheet();
+  }
+
+  // Renders the current subject/body into #print-area as a single simple
+  // page (plain text, not the gantt-styled timetable), reusing the same
+  // .print-output color variables so it still matches the chosen PDF theme.
+  function buildContactSheetPrintArea(){
+    const area = document.getElementById("print-area");
+    area.innerHTML = "";
+    applyPrintStyleVars(area);
+    const page = document.createElement("div");
+    page.className = "print-page";
+    page.style.padding = "20px";
+    const title = document.createElement("div");
+    title.className = "print-title";
+    title.textContent = document.getElementById("csSubject").value || "出演者連絡シート";
+    const body = document.createElement("div");
+    body.style.cssText = "white-space:pre-wrap;font-size:14px;line-height:1.9;margin-top:16px;";
+    body.textContent = document.getElementById("csBody").value;
+    page.appendChild(title);
+    page.appendChild(body);
+    area.appendChild(page);
+  }
+
+  function copyContactSheetBody(){
+    const text = document.getElementById("csBody").value;
+    const status = document.getElementById("csCopyStatus");
+    const showResult = ok => { if(status) status.textContent = ok ? "本文をコピーしました。" : "コピーに失敗しました。お手数ですが本文を選択してコピーしてください。"; };
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(()=>showResult(true)).catch(()=>showResult(false));
+    } else {
+      // Fallback for browsers/contexts without the async Clipboard API.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed"; ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      let ok = false;
+      try{ ok = document.execCommand("copy"); }catch(e){ ok = false; }
+      document.body.removeChild(ta);
+      showResult(ok);
+    }
+  }
+
   function renderArtistMasterTab(){
     const wrap = document.getElementById("artistMasterWrap");
     if(!wrap) return;
@@ -1551,7 +1778,7 @@
         state.artists.push({
           id:uid(), name:m.name, color: colorForIndex(state.artists.length),
           dayId, stageId:"", liveStart:"", liveEnd:"", durationMin:"", changeoverMin:"",
-          tokutenSpotId:"", tokutenStart:"", tokutenEnd:"", memo:m.memo||"",
+          tokutenSpotId:"", tokutenStart:"", tokutenEnd:"", tokutenDurationMin:"", greenRoomId:"", callTime:"", memo:m.memo||"",
           audience:"", ticketSales:"", favorability:""
         });
       });
@@ -1568,10 +1795,11 @@
     fillDaySelect(afDay, keep);
     fillSelect(document.getElementById("afStage"), state.stages, "", "（未定）");
     fillSelect(document.getElementById("afTokuten"), state.tokutenSpots, "", "（参加なし）");
+    fillSelect(document.getElementById("afGreenRoom"), state.greenRooms, "", "（未定）");
   }
 
   // ---------- Artist table sort (display order only; does not reorder state.artists) ----------
-  const ARTIST_TABLE_TIME_KEYS = new Set(["liveStart","liveEnd","tokutenStart","tokutenEnd"]);
+  const ARTIST_TABLE_TIME_KEYS = new Set(["liveStart","liveEnd","tokutenStart","tokutenEnd","callTime"]);
   let artistTableSortKey = null, artistTableSortDir = "asc";
   function getArtistSortValue(a, key){
     if(key==="dayId") return state.days.findIndex(d=>d.id===a.dayId);
@@ -1632,6 +1860,9 @@
         <td><select data-role="tokutenSpotId" style="min-width:110px;"></select></td>
         <td>${timeFieldHtml("tokutenStart", a.tokutenStart)}</td>
         <td>${timeFieldHtml("tokutenEnd", a.tokutenEnd)}</td>
+        <td><input type="number" data-role="tokutenDurationMin" min="0" step="5" value="${escapeAttr(a.tokutenDurationMin||"")}" style="width:60px;" title="特典会の尺（分）。入力すると特典会終了を自動計算します"></td>
+        <td><select data-role="greenRoomId" style="min-width:90px;"></select></td>
+        <td>${timeFieldHtml("callTime", a.callTime)}</td>
         <td><input type="text" data-role="memo" value="${escapeAttr(a.memo)}" style="min-width:100px;"></td>
         <td class="admin-field"><input type="number" data-role="audience" min="0" step="1" value="${escapeAttr(a.audience||"")}" style="width:70px;" title="動員数（人）"></td>
         <td class="admin-field"><input type="number" data-role="ticketSales" min="0" step="100" value="${escapeAttr(a.ticketSales||"")}" style="width:90px;" title="チケット売上（円）"></td>
@@ -1648,16 +1879,18 @@
       fillDaySelect(tr.querySelector('[data-role=dayId]'), a.dayId);
       fillSelect(tr.querySelector('[data-role=stageId]'), state.stages, a.stageId, "（未定）");
       fillSelect(tr.querySelector('[data-role=tokutenSpotId]'), state.tokutenSpots, a.tokutenSpotId, "（参加なし）");
+      fillSelect(tr.querySelector('[data-role=greenRoomId]'), state.greenRooms, a.greenRoomId, "（未定）");
       tr.querySelector('[data-role=favorability]').value = a.favorability || "";
 
       const timeRoles = ["liveStart","liveEnd","tokutenStart","tokutenEnd"];
       tr.querySelectorAll("input,select").forEach(el=>{
         const role = el.dataset.role;
-        if(!role || timeRoles.includes(role) || role.endsWith("_late")) return;
+        if(!role || timeRoles.includes(role) || role==="callTime" || role.endsWith("_late")) return;
         el.addEventListener("change", ()=>{
           if(role==="name") a.name = el.value;
           else if(role==="memo") a.memo = el.value;
-          else if(role==="durationMin"){ a.durationMin = el.value; syncEndFromDuration(a); }
+          else if(role==="durationMin"){ a.durationMin = el.value; syncEndFromDuration(a, "live"); }
+          else if(role==="tokutenDurationMin"){ a.tokutenDurationMin = el.value; syncEndFromDuration(a, "tokuten"); }
           else if(role==="changeoverMin"){ a.changeoverMin = el.value; }
           else a[role] = el.value;
           saveState(); renderAll();
@@ -1666,6 +1899,9 @@
       timeRoles.forEach(role=>{
         wireTimeField(tr, role, v=>{ a[role]=v; onLiveTimeFieldEdited(a, role); saveState(); renderAll(); });
       });
+      // 入り時間(callTime) is a standalone point-in-time with no end/duration
+      // pairing, so it's wired directly rather than through onLiveTimeFieldEdited.
+      wireTimeField(tr, "callTime", v=>{ a.callTime=v; saveState(); renderAll(); });
       tr.querySelector('[data-role=color]').addEventListener("click", ()=>{
         const idx = PALETTE.indexOf(a.color);
         a.color = PALETTE[(idx+1)%PALETTE.length];
@@ -1795,7 +2031,7 @@
         artist[startKey] = minToTime(pendingStart);
         artist[endKey] = minToTime(pendingEnd);
         if(laneChanged) artist[laneKey] = hoverLaneId;
-        if(kind==="live") syncDurationFromTimes(artist);
+        syncDurationFromTimes(artist, kind);
         saveState();
         renderAll();
       }
@@ -2133,8 +2369,15 @@
     }
   }
 
-  window.addEventListener("beforeprint", buildPrintArea);
+  // Indirection so window.print()'s "beforeprint" event rebuilds whichever
+  // content was most recently requested (the main timetable PDF vs. a
+  // single-artist contact sheet) rather than always overwriting #print-area
+  // with the timetable. Each print-triggering button sets this right before
+  // calling window.print().
+  let activePrintBuilder = buildPrintArea;
+  window.addEventListener("beforeprint", ()=> activePrintBuilder());
   document.getElementById("btnPrint").addEventListener("click", ()=>{
+    activePrintBuilder = buildPrintArea;
     buildPrintArea();
     window.print();
   });
@@ -2559,6 +2802,7 @@
     renderStatsTab();
     renderArtistNameList();
     renderArtistMasterTab();
+    renderContactSheetTab();
     updateClock();
     applyAdminVisibility();
     document.title = (state.event.name?state.event.name+" - ":"")+"CueFes";
@@ -2718,6 +2962,13 @@
     state.tokutenSpots.push({id:uid(), name});
     inp.value=""; saveState(); renderAll();
   });
+  document.getElementById("btnAddGreenRoom").addEventListener("click", ()=>{
+    const inp = document.getElementById("newGreenRoomName");
+    const name = inp.value.trim();
+    if(!name) return;
+    state.greenRooms.push({id:uid(), name});
+    inp.value=""; saveState(); renderAll();
+  });
 
   document.getElementById("btnAddArtistMaster").addEventListener("click", ()=>{
     const nameInp = document.getElementById("amName");
@@ -2730,24 +2981,32 @@
     renderArtistMasterTab();
   });
 
-  // 尺(分) drives ライブ終了 automatically: typing/adjusting duration recomputes
-  // the end time from the current start time. Changing the start time (while a
-  // duration is set) keeps the duration fixed and shifts the end time with it.
-  function syncAfLiveEndFromDuration(){
+  // 尺(分) drives ライブ/特典会終了 automatically: typing/adjusting duration
+  // recomputes the end time from the current start time. Changing the start
+  // time (while a duration is set) keeps the duration fixed and shifts the
+  // end time with it.
+  function syncAfEndFromDuration(startRole, endRole, durationInputId){
     const formEl = document.getElementById("addArtistForm");
-    const start = readTimeGroup(formEl, "afLiveStart");
-    const dur = parseInt(document.getElementById("afDuration").value, 10);
+    const start = readTimeGroup(formEl, startRole);
+    const dur = parseInt(document.getElementById(durationInputId).value, 10);
     if(start && !isNaN(dur) && dur>0){
-      writeTimeGroup(formEl, "afLiveEnd", minToTime(timeToMin(start)+dur));
+      writeTimeGroup(formEl, endRole, minToTime(timeToMin(start)+dur));
     }
   }
+  function syncAfLiveEndFromDuration(){ syncAfEndFromDuration("afLiveStart", "afLiveEnd", "afDuration"); }
+  function syncAfTokutenEndFromDuration(){ syncAfEndFromDuration("afTokutenStart", "afTokutenEnd", "afTokutenDuration"); }
   document.getElementById("afDuration").addEventListener("input", syncAfLiveEndFromDuration);
+  document.getElementById("afTokutenDuration").addEventListener("input", syncAfTokutenEndFromDuration);
   (function(){
     const formEl = document.getElementById("addArtistForm");
     const startTime = formEl.querySelector('[data-role="afLiveStart"]');
     const startLate = formEl.querySelector('[data-role="afLiveStart_late"]');
     startTime.addEventListener("change", syncAfLiveEndFromDuration);
     startLate.addEventListener("change", syncAfLiveEndFromDuration);
+    const tokStartTime = formEl.querySelector('[data-role="afTokutenStart"]');
+    const tokStartLate = formEl.querySelector('[data-role="afTokutenStart_late"]');
+    tokStartTime.addEventListener("change", syncAfTokutenEndFromDuration);
+    tokStartLate.addEventListener("change", syncAfTokutenEndFromDuration);
   })();
 
   document.getElementById("btnAddArtist").addEventListener("click", ()=>{
@@ -2758,8 +3017,10 @@
     const le = readTimeGroup(formEl, "afLiveEnd");
     const ts = readTimeGroup(formEl, "afTokutenStart");
     const te = readTimeGroup(formEl, "afTokutenEnd");
+    const ct = readTimeGroup(formEl, "afCallTime");
     const durationVal = document.getElementById("afDuration").value.trim();
     const changeoverVal = document.getElementById("afChangeover").value.trim();
+    const tokutenDurationVal = document.getElementById("afTokutenDuration").value.trim();
     const newArtist = {
       id:uid(), name, color: colorForIndex(state.artists.length),
       dayId: document.getElementById("afDay").value || state.days[0].id,
@@ -2767,22 +3028,25 @@
       liveStart: ls, liveEnd: le,
       durationMin: durationVal, changeoverMin: changeoverVal,
       tokutenSpotId: document.getElementById("afTokuten").value,
-      tokutenStart: ts, tokutenEnd: te,
+      tokutenStart: ts, tokutenEnd: te, tokutenDurationMin: tokutenDurationVal,
+      greenRoomId: document.getElementById("afGreenRoom").value, callTime: ct,
       memo: document.getElementById("afMemo").value.trim(),
       audience: adminFieldsVisible() ? document.getElementById("afAudience").value.trim() : "",
       ticketSales: adminFieldsVisible() ? document.getElementById("afTicketSales").value.trim() : "",
       favorability: adminFieldsVisible() ? document.getElementById("afFavorability").value : ""
     };
-    if(!newArtist.durationMin) syncDurationFromTimes(newArtist);
+    if(!newArtist.durationMin) syncDurationFromTimes(newArtist, "live");
+    if(!newArtist.tokutenDurationMin) syncDurationFromTimes(newArtist, "tokuten");
     state.artists.push(newArtist);
     document.getElementById("afName").value = "";
     document.getElementById("afMemo").value = "";
     document.getElementById("afDuration").value = "";
     document.getElementById("afChangeover").value = "";
+    document.getElementById("afTokutenDuration").value = "";
     document.getElementById("afAudience").value = "";
     document.getElementById("afTicketSales").value = "";
     document.getElementById("afFavorability").value = "";
-    ["afLiveStart","afLiveEnd","afTokutenStart","afTokutenEnd"].forEach(role=>resetTimeGroup(formEl, role));
+    ["afLiveStart","afLiveEnd","afTokutenStart","afTokutenEnd","afCallTime"].forEach(role=>resetTimeGroup(formEl, role));
     saveState(); renderAll();
   });
 
@@ -2796,7 +3060,7 @@
   });
   document.getElementById("btnCsvExport").addEventListener("click", exportCSV);
   document.getElementById("btnCsvTemplate").addEventListener("click", ()=>{
-    const headers = adminFieldsVisible() ? CSV_HEADERS : CSV_HEADERS.slice(0,11);
+    const headers = adminFieldsVisible() ? CSV_HEADERS : CSV_HEADERS.slice(0,14);
     downloadBlob(headers.map(csvField).join(",")+"\n", "artist_template.csv", "text/csv;charset=utf-8");
   });
 
@@ -2811,6 +3075,30 @@
   document.getElementById("btnArtistMasterCsvTemplate").addEventListener("click", ()=>{
     downloadBlob(ARTIST_MASTER_CSV_HEADERS.map(csvField).join(",")+"\n", "artist_master_template.csv", "text/csv;charset=utf-8");
   });
+
+  document.getElementById("csDay").addEventListener("change", ()=>{
+    // Switching DAY changes which artists are selectable, so always give a
+    // fresh draft for whichever artist ends up selected (nothing meaningful
+    // to preserve across a DAY switch).
+    document.getElementById("csBody").value = "";
+    renderContactSheetTab();
+  });
+  document.getElementById("csArtist").addEventListener("change", regenerateContactSheet);
+  document.getElementById("btnCsRegenerate").addEventListener("click", ()=>{
+    if(document.getElementById("csBody").value.trim() && !confirm("編集中の内容を、最新のタイムテーブル情報で作り直します。よろしいですか？")) return;
+    regenerateContactSheet();
+  });
+  document.getElementById("btnCsPdf").addEventListener("click", ()=>{
+    activePrintBuilder = buildContactSheetPrintArea;
+    buildContactSheetPrintArea();
+    window.print();
+  });
+  document.getElementById("btnCsMailto").addEventListener("click", ()=>{
+    const subject = encodeURIComponent(document.getElementById("csSubject").value);
+    const body = encodeURIComponent(document.getElementById("csBody").value);
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
+  });
+  document.getElementById("btnCsCopy").addEventListener("click", copyContactSheetBody);
 
   document.getElementById("ocrFileInput").addEventListener("change", e=>{
     const f = e.target.files[0] || null;
