@@ -234,10 +234,10 @@
   <button data-tab="artists">③ アーティスト管理</button>
   <button data-tab="live">④ ライブTT</button>
   <button data-tab="tokuten">⑤ 特典会TT</button>
-  <button data-tab="output">⑥ PDF出力</button>
+  <button data-tab="output" class="admin-field">⑥ PDF出力</button>
   <button data-tab="stats" class="admin-field">⑦ 実績集計</button>
-  <button data-tab="master">⑧ アーティストマスタ</button>
-  <button data-tab="contactsheet">⑨ 出演者連絡シート</button>
+  <button data-tab="master" class="admin-field">⑧ アーティストマスタ</button>
+  <button data-tab="contactsheet" class="admin-field">⑨ 出演者連絡シート</button>
   <button data-tab="clock" class="clock-tab">現在時刻</button>
 </nav>
 
@@ -2771,20 +2771,23 @@
     downloadBlob(lines.join("\n"), "artist_history_database.csv", "text/csv;charset=utf-8");
   }
 
-  // Shows/hides every element tagged admin-field (nav tab, table columns, form
-  // fields) based on the current lock state, and bounces off the stats tab if
-  // it's active but has just become hidden. Also refreshes the login button text.
+  // Shows/hides every element tagged admin-field (nav tabs ⑥⑦⑧⑨, table
+  // columns, form fields) based on the current lock state, and bounces off
+  // to the always-visible ①基本設定 tab if the currently active tab is one
+  // that has just become hidden. Also refreshes the login button text.
   function applyAdminVisibility(){
     const visible = adminFieldsVisible();
     document.querySelectorAll(".admin-field").forEach(el=>{ el.style.display = visible ? "" : "none"; });
-    const statsBtn = document.querySelector('nav.tabs button[data-tab="stats"]');
-    if(!visible && statsBtn && statsBtn.classList.contains("active")){
-      document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
-      document.querySelectorAll(".tabcontent").forEach(t=>t.classList.remove("active"));
-      const settingsBtn = document.querySelector('nav.tabs button[data-tab="settings"]');
-      const settingsTab = document.getElementById("tab-settings");
-      if(settingsBtn) settingsBtn.classList.add("active");
-      if(settingsTab) settingsTab.classList.add("active");
+    if(!visible){
+      const activeAdminTabBtn = document.querySelector('nav.tabs button.admin-field.active');
+      if(activeAdminTabBtn){
+        document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+        document.querySelectorAll(".tabcontent").forEach(t=>t.classList.remove("active"));
+        const settingsBtn = document.querySelector('nav.tabs button[data-tab="settings"]');
+        const settingsTab = document.getElementById("tab-settings");
+        if(settingsBtn) settingsBtn.classList.add("active");
+        if(settingsTab) settingsTab.classList.add("active");
+      }
     }
     const toggleBtn = document.getElementById("btnAdminToggle");
     if(toggleBtn) toggleBtn.textContent = adminUnlocked ? "管理者モード：ON（ログアウト）" : "管理者ログイン";
