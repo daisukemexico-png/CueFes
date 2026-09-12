@@ -161,6 +161,13 @@
   .gantt-v .block .resize-handle{position:absolute;left:0;right:0;height:8px;cursor:ns-resize;}
   .gantt-v .block .resize-handle.top{top:-3px;}
   .gantt-v .block .resize-handle.bottom{bottom:-3px;}
+  .gantt-v .block .block-copy-btn{
+    position:absolute;top:2px;right:2px;z-index:3;
+    background:rgba(255,255,255,.85);border:1px solid #0002;border-radius:4px;
+    font-size:9px;line-height:1.3;padding:1px 4px;cursor:pointer;color:var(--accent2);
+    opacity:.55;transition:opacity .1s;
+  }
+  .gantt-v .block:hover .block-copy-btn{opacity:1;}
   .gantt-v .block.dragging{opacity:.85;z-index:5;box-shadow:0 3px 10px #0008;}
   .gantt-v .block.duplicating{outline:2px dashed var(--accent2);outline-offset:1px;cursor:copy;}
   .unscheduled-tray{border:1px dashed var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--panel2);}
@@ -256,6 +263,7 @@
   <button data-tab="stats" class="admin-field">⑦ 実績集計</button>
   <button data-tab="master" class="admin-field">⑧ アーティストマスタ</button>
   <button data-tab="contactsheet" class="admin-field">⑨ 出演者連絡シート</button>
+  <button data-tab="staffschedule" class="admin-field">⑩ 進行表</button>
   <button data-tab="clock" class="clock-tab">現在時刻</button>
 </nav>
 
@@ -674,6 +682,43 @@
     </div>
   </div>
 
+  <!-- ============ TAB: STAFF/BACKSTAGE SCHEDULE ============ -->
+  <div class="tabcontent" id="tab-staffschedule">
+    <div class="card">
+      <h2>進行表（裏方タイムスケジュール）</h2>
+      <p class="helptext">
+        舞台監督・照明・音響・映像・制作・出演者・アルバイトなど、担当ごとに搬入〜仕込み〜リハーサル〜本番〜撤収の作業内容を並べた、裏方向けの進行表を作成できます。③〜⑤のアーティストの出演スケジュールとは別の、独立したデータです。<br>
+        列の名前は下の「担当の名前」欄で書き換えられます（列の数は固定です）。
+      </p>
+      <div class="row" id="staffLaneNameInputs" style="flex-wrap:wrap;"></div>
+    </div>
+
+    <div class="card">
+      <h2>作業を追加する</h2>
+      <div class="grid cols4" id="addStaffTaskForm">
+        <div><label>DAY</label><select id="stDay"></select></div>
+        <div><label>担当</label><select id="stLane"></select></div>
+        <div><label>作業内容</label><input type="text" id="stLabel" placeholder="例：搬入、仕込み、リハーサル"></div>
+        <div><label>メモ</label><input type="text" id="stMemo" placeholder="任意"></div>
+        <div><label>開始</label><span class="timefield"><input type="time" step="300" data-role="stStart"><label class="timefield-late"><input type="checkbox" data-role="stStart_late">翌日</label></span></div>
+        <div><label>終了</label><span class="timefield"><input type="time" step="300" data-role="stEnd"><label class="timefield-late"><input type="checkbox" data-role="stEnd_late">翌日</label></span></div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn" id="btnAddStaffTask">＋ 作業を追加</button>
+      </div>
+      <p class="helptext" style="margin-top:8px;">開始・終了を空欄のまま追加すると、下の進行表の上部に「未設定」チップとして表示され、ドラッグで時間を決められます（アーティストの出演スケジュールと同じ操作方法です）。</p>
+    </div>
+
+    <div id="staffDaySections"></div>
+
+    <div class="card">
+      <h2>Excelで出力する</h2>
+      <p class="helptext">DAYごとに1シートずつ、担当を列にした進行表をExcelファイル（.xlsx）として書き出します。アーティストの出演スケジュール（⑥PDF出力タブのExcel出力）とは別のファイルになります。</p>
+      <button class="btn secondary" id="btnExportStaffXlsx" style="font-size:15px;padding:12px 22px;">進行表をExcelで保存する</button>
+      <div class="helptext" id="staffXlsxStatus" style="margin-top:8px;"></div>
+    </div>
+  </div>
+
   <!-- ============ TAB: LIVE CLOCK ============ -->
   <div class="tabcontent" id="tab-clock">
     <div class="card" style="text-align:center;">
@@ -702,6 +747,7 @@
   const ARTIST_MASTER_KEY = "cuefes_artist_master_v1";
   const PALETTE = ["#ffb3c6","#b3e5ff","#c8f7c5","#ffe3a3","#d9b3ff","#ffc9de","#a3f0e0",
                     "#ffd6a3","#b3c6ff","#f7c5e0","#c5e8f7","#e0f7c5"];
+  const STAFF_TASK_COLOR = "#dbe4ea"; // neutral blue-gray, distinct from the artist pastel PALETTE
   const PRINT_HEIGHT_BUDGET = 940; // px budget for one A4 portrait page content height
 
   // ---------- Print output style (color scheme for PDF/print output) ----------
@@ -735,6 +781,8 @@
   // are already present, so upgrading never resets existing user data.
   function normalizePrintStyle(s){
     if(!Array.isArray(s.greenRooms)) s.greenRooms = [];
+    if(!Array.isArray(s.staffLanes) || s.staffLanes.length===0) s.staffLanes = defaultStaffLanes();
+    if(!Array.isArray(s.staffTasks)) s.staffTasks = [];
     if(!s.printStyle || typeof s.printStyle!=="object"){
       s.printStyle = clonePrintStyle(DEFAULT_PRINT_STYLE);
       return s;
@@ -762,9 +810,16 @@
       stages:[ {id:uid(), name:"Aステージ"}, {id:uid(), name:"Bステージ"} ],
       tokutenSpots:[ {id:uid(), name:"特典会場1"}, {id:uid(), name:"特典会場2"} ],
       greenRooms:[],
+      staffLanes: defaultStaffLanes(),
+      staffTasks: [],
       artists:[],
       printStyle: clonePrintStyle(DEFAULT_PRINT_STYLE)
     };
+  }
+  // 「⑩ 進行表」の担当（部門）列。ステージ等と違い、列数は固定（追加/削除はしない）。
+  // 列名はイベントごとに書き換え可能（例：「アルバイト」→「警備」など）。
+  function defaultStaffLanes(){
+    return ["舞台監督","照明","音響","映像","制作","出演者","アルバイト"].map(name=>({id:uid(), name}));
   }
 
   function loadState(){
@@ -2215,6 +2270,387 @@
     });
   }
 
+  // ==========================================================================
+  // ⑩ 進行表（裏方タイムスケジュール）— a second, independent gantt for
+  // free-text staff/crew tasks (搬入・仕込み・リハーサル…), separate from the
+  // artist-booking data used by ④⑤. Deliberately NOT unified with
+  // attachBlockDragHandlers/renderGanttInto above: staff tasks have no
+  // duration-sync, changeover, or conflict-detection concept, so a smaller
+  // dedicated set of functions is clearer than forcing a third "kind" through
+  // logic that's really about artists.
+  // ==========================================================================
+  function attachStaffBlockDragHandlers(block, task, pxPerMin, startMinOfChart, laneTrackEls, laneOrderIds){
+    let dragMode = null, dragStartY = 0, origStartMin = 0, origEndMin = 0, pointerId = null;
+    let pendingStart = null, pendingEnd = null, origLaneId = null, hoverLaneId = null, laneRects = null;
+    let duplicateMode = false;
+
+    function laneAtX(clientX){
+      if(!laneRects || laneOrderIds.length===0) return origLaneId;
+      for(const id of laneOrderIds){
+        const r = laneRects[id];
+        if(r && clientX >= r.left && clientX < r.right) return id;
+      }
+      const first = laneRects[laneOrderIds[0]];
+      const last = laneRects[laneOrderIds[laneOrderIds.length-1]];
+      if(first && clientX < first.left) return laneOrderIds[0];
+      if(last && clientX >= last.right) return laneOrderIds[laneOrderIds.length-1];
+      return origLaneId;
+    }
+    function onPointerMove(ev){
+      if(!dragMode) return;
+      const deltaY = (ev.clientY||0) - dragStartY;
+      const deltaMin = Math.round((deltaY/pxPerMin)/DRAG_SNAP_MIN)*DRAG_SNAP_MIN;
+      let newStart = origStartMin, newEnd = origEndMin;
+      if(dragMode==="move"){
+        newStart = origStartMin + deltaMin; newEnd = origEndMin + deltaMin;
+        if(newStart<0){ newEnd += -newStart; newStart = 0; }
+        if(newEnd>DRAG_MAX_MIN){ newStart -= (newEnd-DRAG_MAX_MIN); newEnd = DRAG_MAX_MIN; }
+        const targetLaneId = laneAtX(ev.clientX!=null ? ev.clientX : null);
+        if(targetLaneId && targetLaneId!==hoverLaneId){
+          const targetTrack = laneTrackEls[targetLaneId];
+          if(targetTrack){
+            if(hoverLaneId){ const prevTrack = laneTrackEls[hoverLaneId]; if(prevTrack) prevTrack.classList.remove("drag-hover"); }
+            targetTrack.classList.add("drag-hover");
+            targetTrack.appendChild(block);
+            hoverLaneId = targetLaneId;
+          }
+        }
+      } else if(dragMode==="resize-start"){
+        newStart = Math.min(origStartMin + deltaMin, origEndMin - DRAG_MIN_DURATION);
+        if(newStart<0) newStart = 0;
+      } else if(dragMode==="resize-end"){
+        newEnd = Math.max(origEndMin + deltaMin, origStartMin + DRAG_MIN_DURATION);
+        if(newEnd>DRAG_MAX_MIN) newEnd = DRAG_MAX_MIN;
+      }
+      pendingStart = newStart; pendingEnd = newEnd;
+      block.style.top = ((newStart-startMinOfChart)*pxPerMin)+"px";
+      block.style.height = Math.max((newEnd-newStart)*pxPerMin-3,18)+"px";
+      const tEl = block.querySelector(".t");
+      if(tEl) tEl.textContent = minToTime(newStart)+"–"+minToTime(newEnd);
+    }
+    function endDrag(){
+      if(!dragMode) return;
+      block.classList.remove("dragging"); block.classList.remove("duplicating");
+      if(hoverLaneId && laneTrackEls[hoverLaneId]) laneTrackEls[hoverLaneId].classList.remove("drag-hover");
+      if(pointerId!=null && block.releasePointerCapture){ try{ block.releasePointerCapture(pointerId); }catch(e){/* noop */} }
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointercancel", onPointerUp);
+      const timeChanged = pendingStart!=null && pendingEnd!=null && (pendingStart!==origStartMin || pendingEnd!==origEndMin);
+      const laneChanged = dragMode==="move" && hoverLaneId && hoverLaneId!==origLaneId;
+      const wasDuplicate = duplicateMode;
+      dragMode = null; duplicateMode = false;
+      if(timeChanged || laneChanged){
+        if(wasDuplicate){
+          const clone = Object.assign({}, task, { id: uid() });
+          clone.start = minToTime(pendingStart); clone.end = minToTime(pendingEnd);
+          if(laneChanged) clone.laneId = hoverLaneId;
+          state.staffTasks.push(clone);
+        } else {
+          task.start = minToTime(pendingStart); task.end = minToTime(pendingEnd);
+          if(laneChanged) task.laneId = hoverLaneId;
+        }
+        saveState(); renderAll();
+      }
+    }
+    function onPointerUp(){ endDrag(); }
+    function startDrag(mode){
+      return function(ev){
+        if(ev.button!=null && ev.button!==0) return;
+        ev.preventDefault(); ev.stopPropagation();
+        dragMode = mode;
+        duplicateMode = (mode==="move") && !!ev.altKey;
+        dragStartY = ev.clientY||0;
+        origStartMin = timeToMin(task.start); origEndMin = timeToMin(task.end);
+        pendingStart = origStartMin; pendingEnd = origEndMin;
+        origLaneId = task.laneId; hoverLaneId = origLaneId;
+        pointerId = ev.pointerId!=null ? ev.pointerId : null;
+        if(mode==="move"){
+          laneRects = {};
+          laneOrderIds.forEach(id=>{ const el = laneTrackEls[id]; if(el) laneRects[id] = el.getBoundingClientRect(); });
+        }
+        block.classList.add("dragging");
+        if(duplicateMode) block.classList.add("duplicating");
+        if(pointerId!=null && block.setPointerCapture){ try{ block.setPointerCapture(pointerId); }catch(e){/* noop */} }
+        document.addEventListener("pointermove", onPointerMove);
+        document.addEventListener("pointerup", onPointerUp);
+        document.addEventListener("pointercancel", onPointerUp);
+      };
+    }
+    block.addEventListener("pointerdown", startDrag("move"));
+    const handleTop = document.createElement("div");
+    handleTop.className = "resize-handle top";
+    handleTop.addEventListener("pointerdown", startDrag("resize-start"));
+    const handleBottom = document.createElement("div");
+    handleBottom.className = "resize-handle bottom";
+    handleBottom.addEventListener("pointerdown", startDrag("resize-end"));
+    block.appendChild(handleTop); block.appendChild(handleBottom);
+  }
+
+  function attachStaffUnscheduledChipDragHandlers(chip, task, pxPerMin, startMinOfChart, laneTrackEls, laneOrderIds){
+    let ghost = null, hoverLaneId = null, laneRects = null;
+    function laneAt(clientX, clientY){
+      if(!laneRects) return null;
+      for(const id of laneOrderIds){
+        const r = laneRects[id];
+        if(r && clientX>=r.left && clientX<r.right && clientY>=r.top && clientY<r.bottom+100000) return id;
+      }
+      return null;
+    }
+    function onPointerMove(ev){
+      if(!ghost) return;
+      ghost.style.left = (ev.clientX+10)+"px"; ghost.style.top = (ev.clientY+10)+"px";
+      const targetLaneId = laneAt(ev.clientX, ev.clientY);
+      if(targetLaneId!==hoverLaneId){
+        if(hoverLaneId && laneTrackEls[hoverLaneId]) laneTrackEls[hoverLaneId].classList.remove("drag-hover");
+        if(targetLaneId && laneTrackEls[targetLaneId]) laneTrackEls[targetLaneId].classList.add("drag-hover");
+        hoverLaneId = targetLaneId;
+      }
+    }
+    function cleanup(){
+      if(ghost){ ghost.remove(); ghost=null; }
+      if(hoverLaneId && laneTrackEls[hoverLaneId]) laneTrackEls[hoverLaneId].classList.remove("drag-hover");
+      hoverLaneId = null;
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointercancel", onPointerUp);
+    }
+    function onPointerUp(ev){
+      const targetLaneId = laneAt(ev.clientX, ev.clientY);
+      cleanup();
+      if(!targetLaneId) return;
+      const track = laneTrackEls[targetLaneId];
+      const rect = track.getBoundingClientRect();
+      const y = ev.clientY - rect.top;
+      const rawMin = startMinOfChart + y/pxPerMin;
+      let start = Math.round(rawMin/DRAG_SNAP_MIN)*DRAG_SNAP_MIN;
+      if(start<0) start = 0;
+      task.laneId = targetLaneId;
+      task.start = minToTime(start);
+      task.end = minToTime(start+20);
+      saveState(); renderAll();
+    }
+    chip.addEventListener("pointerdown", ev=>{
+      if(ev.button!=null && ev.button!==0) return;
+      ev.preventDefault();
+      laneRects = {};
+      laneOrderIds.forEach(id=>{ const el = laneTrackEls[id]; if(el) laneRects[id] = el.getBoundingClientRect(); });
+      ghost = document.createElement("div");
+      ghost.className = "unscheduled-ghost";
+      ghost.textContent = task.label;
+      ghost.style.left = (ev.clientX+10)+"px"; ghost.style.top = (ev.clientY+10)+"px";
+      document.body.appendChild(ghost);
+      document.addEventListener("pointermove", onPointerMove);
+      document.addEventListener("pointerup", onPointerUp);
+      document.addEventListener("pointercancel", cleanup);
+    });
+  }
+
+  // Renders one DAY's staff gantt into container. Mirrors renderGanttInto's
+  // visual structure (axis column + lane columns + draggable blocks) but
+  // reads state.staffTasks/state.staffLanes instead of artists/stages.
+  function renderStaffGanttInto(container, dayId, opts){
+    opts = opts || {};
+    const lanes = state.staffLanes;
+    const dayTasks = state.staffTasks.filter(t=>t.dayId===dayId);
+    container.innerHTML = "";
+    if(lanes.length===0){
+      container.innerHTML = `<div class="helptext">担当列がありません。</div>`;
+      return;
+    }
+    let mins = [];
+    dayTasks.forEach(t=>{
+      if(t.laneId && isValidTime(t.start)) mins.push(timeToMin(t.start));
+      if(t.laneId && isValidTime(t.end)) mins.push(timeToMin(t.end));
+    });
+    if(mins.length===0) mins = [480,1260]; // default 8:00-21:00 for a production day
+    let startMin = Math.floor(Math.min(...mins)/30)*30;
+    let endMin = Math.ceil(Math.max(...mins)/30)*30;
+    if(endMin-startMin<60) endMin = startMin+60;
+    const totalMin = endMin-startMin;
+
+    let pxPerMin;
+    if(opts.pxPerMin) pxPerMin = opts.pxPerMin;
+    else if(opts.fitHeightPx) pxPerMin = Math.max(1.0, Math.min(2.3, opts.fitHeightPx/totalMin));
+    else pxPerMin = 1.6;
+
+    const headerH = 34;
+    const trackH = totalMin*pxPerMin;
+    const wrap = document.createElement("div");
+    wrap.className = "gantt-v";
+
+    const axisCol = document.createElement("div");
+    axisCol.className = "axis-col";
+    axisCol.style.height = (headerH+trackH)+"px";
+    const axisHeader = document.createElement("div");
+    axisHeader.className = "axis-header";
+    axisCol.appendChild(axisHeader);
+    for(let t=startMin; t<=endMin; t+=30){
+      const tick = document.createElement("div");
+      tick.className = "tick";
+      tick.style.top = (headerH+(t-startMin)*pxPerMin)+"px";
+      tick.textContent = minToTime(t);
+      axisCol.appendChild(tick);
+    }
+    wrap.appendChild(axisCol);
+
+    const laneTrackEls = {};
+    const laneOrderIds = lanes.map(l=>l.id);
+    lanes.forEach(lane=>{
+      const laneDiv = document.createElement("div");
+      laneDiv.className = "lane";
+      const header = document.createElement("div");
+      header.className = "lane-header";
+      header.textContent = lane.name;
+      const track = document.createElement("div");
+      track.className = "lane-track";
+      track.style.height = trackH+"px";
+      laneDiv.appendChild(header); laneDiv.appendChild(track);
+      wrap.appendChild(laneDiv);
+      laneTrackEls[lane.id] = track;
+    });
+
+    lanes.forEach(lane=>{
+      const track = laneTrackEls[lane.id];
+      dayTasks.filter(t=>t.laneId===lane.id && isValidTime(t.start) && isValidTime(t.end)).forEach(t=>{
+        const s = timeToMin(t.start), e = timeToMin(t.end);
+        if(e<=s) return;
+        const block = document.createElement("div");
+        block.className = "block";
+        block.style.top = ((s-startMin)*pxPerMin)+"px";
+        block.style.height = Math.max((e-s)*pxPerMin-3,18)+"px";
+        block.style.background = t.color || "#e0e0e0";
+        block.innerHTML = `<b>${escapeHtml(t.label)}</b><span class="t">${t.start}–${t.end}</span>`;
+        block.title = t.label+" "+t.start+"〜"+t.end+(t.memo?(" / "+t.memo):"")+(opts.interactive!==false ? "\n（ドラッグで移動／担当変更、上下端をドラッグで長さを変更できます。Alt/Optionキーを押しながらドラッグすると複製されます）" : "");
+        if(opts.interactive!==false) attachStaffBlockDragHandlers(block, t, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+        track.appendChild(block);
+      });
+    });
+
+    container.appendChild(wrap);
+
+    if(opts.interactive!==false){
+      const unscheduled = dayTasks.filter(t=>!isValidTime(t.start) || !isValidTime(t.end));
+      if(unscheduled.length>0){
+        const tray = document.createElement("div");
+        tray.className = "unscheduled-tray";
+        const label = document.createElement("div");
+        label.className = "unscheduled-tray-label";
+        label.textContent = "未設定（ドラッグして担当・時間を決める）：";
+        tray.appendChild(label);
+        const list = document.createElement("div");
+        list.className = "unscheduled-tray-list";
+        unscheduled.forEach(t=>{
+          const chip = document.createElement("div");
+          chip.className = "unscheduled-chip";
+          const laneNm = t.laneId ? (byId(state.staffLanes, t.laneId)||{}).name : "";
+          chip.textContent = t.label + (laneNm ? "（"+laneNm+"）" : "");
+          chip.title = "ドラッグして担当・時間を設定";
+          attachStaffUnscheduledChipDragHandlers(chip, t, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+          list.appendChild(chip);
+        });
+        tray.appendChild(list);
+        container.insertBefore(tray, wrap);
+      }
+    }
+  }
+
+  function renderStaffLaneNameInputs(){
+    const wrap = document.getElementById("staffLaneNameInputs");
+    if(!wrap) return;
+    wrap.innerHTML = state.staffLanes.map((lane,i)=>
+      `<div><label style="font-size:11px;">担当${i+1}</label><input type="text" data-role="staffLaneName" data-id="${lane.id}" value="${escapeAttr(lane.name)}" style="width:110px;"></div>`
+    ).join("");
+    wrap.querySelectorAll('[data-role="staffLaneName"]').forEach(inp=>{
+      inp.addEventListener("change", ()=>{
+        const lane = byId(state.staffLanes, inp.dataset.id);
+        if(lane){ lane.name = inp.value.trim() || lane.name; saveState(); renderAll(); }
+      });
+    });
+  }
+
+  function renderStaffTaskTable(container, dayId){
+    const tasks = state.staffTasks.filter(t=>t.dayId===dayId);
+    if(tasks.length===0){
+      container.innerHTML = `<div class="helptext">このDAYにはまだ作業が登録されていません。</div>`;
+      return;
+    }
+    container.innerHTML = `
+      <div style="overflow-x:auto;">
+        <table class="data">
+          <thead><tr><th>担当</th><th>作業内容</th><th>開始</th><th>終了</th><th>メモ</th><th></th></tr></thead>
+          <tbody>
+            ${tasks.map(t=>`
+              <tr data-id="${t.id}">
+                <td><select data-role="laneId"></select></td>
+                <td><input type="text" data-role="label" value="${escapeAttr(t.label)}"></td>
+                <td>${timeFieldHtml("start", t.start)}</td>
+                <td>${timeFieldHtml("end", t.end)}</td>
+                <td><input type="text" data-role="memo" value="${escapeAttr(t.memo||"")}"></td>
+                <td><button class="del-btn" title="削除">✕</button></td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>`;
+    container.querySelectorAll("tbody tr").forEach(tr=>{
+      const t = byId(tasks, tr.dataset.id);
+      if(!t) return;
+      fillSelect(tr.querySelector('[data-role=laneId]'), state.staffLanes, t.laneId, "（未定）");
+      tr.querySelector('[data-role=laneId]').addEventListener("change", e=>{ t.laneId=e.target.value; saveState(); renderAll(); });
+      tr.querySelector('[data-role=label]').addEventListener("change", e=>{ t.label=e.target.value.trim()||t.label; saveState(); renderAll(); });
+      tr.querySelector('[data-role=memo]').addEventListener("change", e=>{ t.memo=e.target.value; saveState(); renderAll(); });
+      wireTimeField(tr, "start", v=>{ t.start=v; saveState(); renderAll(); });
+      wireTimeField(tr, "end", v=>{ t.end=v; saveState(); renderAll(); });
+      tr.querySelector(".del-btn").addEventListener("click", ()=>{
+        if(!confirm(`「${t.label}」を削除しますか？`)) return;
+        state.staffTasks = state.staffTasks.filter(x=>x.id!==t.id);
+        saveState(); renderAll();
+      });
+    });
+  }
+
+  function renderStaffTab(){
+    renderStaffLaneNameInputs();
+    fillDaySelect(document.getElementById("stDay"), state.days[0].id);
+    fillSelect(document.getElementById("stLane"), state.staffLanes, "", "（未定）");
+
+    const wrap = document.getElementById("staffDaySections");
+    if(!wrap) return;
+    wrap.innerHTML = "";
+    state.days.forEach(day=>{
+      const section = document.createElement("div");
+      section.className = "card";
+      section.innerHTML = `<h2>${escapeHtml(day.label)}${day.date?"（"+escapeHtml(day.date)+"）":""}</h2>
+        <div class="gantt-v-wrap" id="staffGantt_${day.id}"></div>
+        <h3 style="margin-top:18px;font-size:14px;">作業一覧（セルを直接編集できます）</h3>
+        <div id="staffTable_${day.id}"></div>`;
+      wrap.appendChild(section);
+      renderStaffGanttInto(section.querySelector(`#staffGantt_${day.id}`), day.id, {interactive:true});
+      renderStaffTaskTable(section.querySelector(`#staffTable_${day.id}`), day.id);
+    });
+  }
+
+  // "→特典会" button on a live block: copies this artist's exact live
+  // start/end into their tokuten fields (same clock time, same duration).
+  // The tokuten venue (lane) is intentionally left untouched — if it isn't
+  // set yet, the artist will show up in ⑤特典会TT's "未設定" tray afterward,
+  // ready to drag onto whichever venue makes sense; the copied duration is
+  // preserved regardless of where exactly it's dropped.
+  function copyLiveTimeToTokuten(artist){
+    if(!isValidTime(artist.liveStart) || !isValidTime(artist.liveEnd)) return;
+    if(isValidTime(artist.tokutenStart) && isValidTime(artist.tokutenEnd)){
+      if(!confirm(`「${artist.name}」には既に特典会の時間が設定されています。ライブと同じ時間（${artist.liveStart}〜${artist.liveEnd}）で上書きしますか？`)) return;
+    }
+    artist.tokutenStart = artist.liveStart;
+    artist.tokutenEnd = artist.liveEnd;
+    syncDurationFromTimes(artist, "tokuten");
+    saveState();
+    renderAll();
+    if(!artist.tokutenSpotId){
+      alert(`「${artist.name}」の特典会時間をライブと同じ${artist.liveStart}〜${artist.liveEnd}にコピーしました。\n「⑤特典会TT」タブの「未設定」から、特典会場へドラッグして配置してください。`);
+    }
+  }
+
   // ---------- Vertical Gantt rendering ----------
   // time axis flows top -> bottom; lanes (stages / tokuten spots) are side-by-side columns
   function renderGanttInto(container, kind, dayId, opts){
@@ -2319,6 +2755,19 @@
           block.title = a.name+" "+a[startKey]+"〜"+a[endKey]+(a.memo?(" / "+a.memo):"")+(opts.interactive!==false ? "\n（ドラッグで移動／"+(kind==="live"?"ステージ":"特典会場")+"変更、上下端をドラッグで尺を変更できます。Alt/Optionキーを押しながらドラッグすると複製されます）" : "");
           if(opts.interactive!==false){
             attachBlockDragHandlers(block, a, startKey, endKey, laneKey, kind, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+            if(kind==="live"){
+              const copyBtn = document.createElement("button");
+              copyBtn.type = "button";
+              copyBtn.className = "block-copy-btn";
+              copyBtn.textContent = "→特典会";
+              copyBtn.title = "この出演時間をコピーして特典会に貼り付ける（同じ開始・終了時刻で、⑤特典会TTの「未設定」に追加されます）";
+              copyBtn.addEventListener("pointerdown", ev=>ev.stopPropagation());
+              copyBtn.addEventListener("click", ev=>{
+                ev.preventDefault(); ev.stopPropagation();
+                copyLiveTimeToTokuten(a);
+              });
+              block.appendChild(copyBtn);
+            }
           }
           track.appendChild(block);
 
@@ -2343,7 +2792,7 @@
     // type a time into the table first. Skipped for non-interactive render
     // (print/PNG export), since dragging doesn't apply there.
     if(opts.interactive!==false){
-      const unscheduled = dayArtists.filter(a=>!isValidTime(a[startKey]) || !isValidTime(a[endKey]));
+      const unscheduled = dayArtists.filter(a=>!a[laneKey] || !isValidTime(a[startKey]) || !isValidTime(a[endKey]));
       if(unscheduled.length>0){
         const tray = document.createElement("div");
         tray.className = "unscheduled-tray";
@@ -2774,6 +3223,114 @@
     }
   }
 
+  // Excel export for ⑩進行表 — one sheet per DAY, columns = staffLanes, rows =
+  // time breakpoints across that day's tasks, mirroring exportXlsx's approach
+  // but reading state.staffTasks/state.staffLanes instead of artists/stages.
+  async function exportStaffXlsx(){
+    const days = state.days;
+    if(days.length===0){ alert("DAYが登録されていません。「②DAY・時間設定」から追加してください。"); return; }
+
+    const statusEl = document.getElementById("staffXlsxStatus");
+    const btn = document.getElementById("btnExportStaffXlsx");
+    btn.disabled = true;
+    if(statusEl) statusEl.textContent = "準備中…（初回はライブラリの読み込みに時間がかかることがあります）";
+    try{
+      await loadXlsxPopulateScript();
+    }catch(e){
+      if(statusEl) statusEl.textContent = "";
+      alert("Excel書き出しに必要なライブラリの読み込みに失敗しました。インターネット接続を確認してください。");
+      btn.disabled = false;
+      return;
+    }
+
+    try{
+      if(statusEl) statusEl.textContent = "Excelファイルを作成中…";
+      const workbook = await window.XlsxPopulate.fromBlankAsync();
+      const usedNames = new Set();
+      function uniqueSheetName(base){
+        let name = sanitizeSheetName(base);
+        let candidate = name, n = 2;
+        while(usedNames.has(candidate)){
+          const suffix = "_"+n;
+          candidate = sanitizeSheetName(name.slice(0, 31-suffix.length)+suffix);
+          n++;
+        }
+        usedNames.add(candidate);
+        return candidate;
+      }
+
+      const lanes = state.staffLanes;
+      days.forEach((day, dayIdx)=>{
+        const sheetName = uniqueSheetName(day.label+"進行表");
+        const sheet = dayIdx===0 ? workbook.sheet(0).name(sheetName) : workbook.addSheet(sheetName);
+
+        const dayTasks = state.staffTasks.filter(t=>t.dayId===day.id && t.laneId && isValidTime(t.start) && isValidTime(t.end));
+        let mins = [];
+        dayTasks.forEach(t=>{ mins.push(timeToMin(t.start)); mins.push(timeToMin(t.end)); });
+        if(mins.length===0) mins = [480,1260];
+        let breakpoints = Array.from(new Set(mins)).sort((x,y)=>x-y);
+        if(breakpoints.length<2) breakpoints = [breakpoints[0], breakpoints[0]+60];
+
+        const headerCell = sheet.cell(1,1);
+        headerCell.value("時刻");
+        safeStyle(headerCell, "bold", true);
+        safeStyle(headerCell, "fill", "DDDDDD");
+        sheet.column(1).width(14);
+        lanes.forEach((lane, li)=>{
+          const c = sheet.cell(1, 2+li);
+          c.value(lane.name);
+          safeStyle(c, "bold", true);
+          safeStyle(c, "fill", "DDDDDD");
+          sheet.column(2+li).width(24);
+        });
+
+        for(let i=0;i<breakpoints.length-1;i++){
+          const rowIdx = 2+i;
+          const t0 = breakpoints[i], t1 = breakpoints[i+1];
+          const timeCell = sheet.cell(rowIdx,1);
+          timeCell.value(minToTime(t0)+"–"+minToTime(t1));
+          safeStyle(timeCell, "fontColor", "888888");
+          try{ sheet.row(rowIdx).height(Math.max(14, Math.min(120,(t1-t0)*0.6))); }catch(e){/* noop */}
+        }
+
+        lanes.forEach((lane, li)=>{
+          const col = 2+li;
+          dayTasks.filter(t=>t.laneId===lane.id).forEach(t=>{
+            try{
+              const s = timeToMin(t.start), e = timeToMin(t.end);
+              const startIdx = breakpoints.indexOf(s), endIdx = breakpoints.indexOf(e);
+              if(startIdx===-1 || endIdx===-1 || endIdx<=startIdx) return;
+              const rowStart = 2+startIdx, rowEnd = 2+endIdx-1;
+              const cell = sheet.cell(rowStart, col);
+              cell.value(t.label+"\n"+t.start+"–"+t.end+(t.memo?"\n"+t.memo:""));
+              if(rowEnd>rowStart) sheet.range(rowStart,col,rowEnd,col).merged(true);
+              safeStyle(cell, "wrapText", true);
+              safeStyle(cell, "verticalAlignment", "center");
+              const hex = (t.color||STAFF_TASK_COLOR).replace("#","").toUpperCase();
+              if(/^[0-9A-F]{6}$/.test(hex)) safeStyle(cell, "fill", hex);
+            }catch(e){ /* skip this one task rather than aborting the whole sheet */ }
+          });
+        });
+
+        try{ sheet.range(1,1,1+breakpoints.length-1, 1+lanes.length).style("border", true); }catch(e){/* noop */}
+      });
+
+      const blob = await workbook.outputAsync();
+      const url = URL.createObjectURL(blob);
+      const fname = (state.event.name||"timetable").replace(/[\\/:*?"<>|]/g,"_")+"_進行表.xlsx";
+      const a = document.createElement("a");
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      if(statusEl) statusEl.textContent = `完了：${days.length}枚のシートを含む進行表Excelファイルを書き出しました。`;
+    }catch(err){
+      if(statusEl) statusEl.textContent = "";
+      alert("Excelファイルの書き出し中にエラーが発生しました。");
+    }finally{
+      btn.disabled = false;
+    }
+  }
+
   async function exportPng(){
     const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
     const includeLive = document.getElementById("chkPrintLive").checked;
@@ -2860,6 +3417,7 @@
   }
   document.getElementById("btnExportPng").addEventListener("click", exportPng);
   document.getElementById("btnExportXlsx").addEventListener("click", exportXlsx);
+  document.getElementById("btnExportStaffXlsx").addEventListener("click", exportStaffXlsx);
 
   // ---------- Stats (動員数・チケット売上・イベンター好感度の集計) ----------
   function computeDayTotals(dayId){
@@ -3187,6 +3745,7 @@
     renderArtistNameList();
     renderArtistMasterTab();
     renderContactSheetTab();
+    renderStaffTab();
     updateClock();
     applyAdminVisibility();
     document.title = (state.event.name?state.event.name+" - ":"")+"CueFes";
@@ -3483,6 +4042,28 @@
     window.location.href = `mailto:?subject=${subject}&body=${body}`;
   });
   document.getElementById("btnCsCopy").addEventListener("click", copyContactSheetBody);
+
+  document.getElementById("btnAddStaffTask").addEventListener("click", ()=>{
+    const label = document.getElementById("stLabel").value.trim();
+    if(!label){ alert("作業内容を入力してください"); return; }
+    const formEl = document.getElementById("addStaffTaskForm");
+    const task = {
+      id: uid(),
+      dayId: document.getElementById("stDay").value || state.days[0].id,
+      laneId: document.getElementById("stLane").value,
+      label,
+      start: readTimeGroup(formEl, "stStart"),
+      end: readTimeGroup(formEl, "stEnd"),
+      memo: document.getElementById("stMemo").value.trim(),
+      color: STAFF_TASK_COLOR
+    };
+    state.staffTasks.push(task);
+    document.getElementById("stLabel").value = "";
+    document.getElementById("stMemo").value = "";
+    resetTimeGroup(formEl, "stStart");
+    resetTimeGroup(formEl, "stEnd");
+    saveState(); renderAll();
+  });
 
   document.getElementById("ocrFileInput").addEventListener("change", e=>{
     const f = e.target.files[0] || null;
