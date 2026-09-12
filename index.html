@@ -77,6 +77,9 @@
   }
   .chip input{width:110px;padding:3px 6px;font-size:12px;}
   .chip button{background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 6px;}
+  .chip button.chip-move{color:var(--muted);font-size:11px;padding:0 2px;}
+  .chip button.chip-move:disabled{opacity:.3;cursor:default;}
+  .chip button.chip-move:not(:disabled):hover{color:var(--accent2);}
   table.data{width:100%;border-collapse:collapse;font-size:12px;}
   table.data th,table.data td{border:1px solid var(--border);padding:7px;text-align:left;vertical-align:middle;}
   table.data th{background:var(--panel2);color:var(--muted);font-weight:600;font-size:11px;}
@@ -132,7 +135,7 @@
   .gantt-v .axis-col{width:56px;flex:0 0 56px;position:relative;}
   .gantt-v .axis-col .axis-header{height:34px;}
   .gantt-v .axis-col .tick{position:absolute;left:0;right:6px;text-align:right;font-size:10px;color:var(--muted);transform:translateY(-6px);}
-  .gantt-v .lane{flex:1;min-width:150px;border-left:1px solid var(--border);position:relative;}
+  .gantt-v .lane{flex:0 0 170px;width:170px;border-left:1px solid var(--border);position:relative;}
   .gantt-v .lane .lane-header{
     height:34px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:13px;
     background:var(--panel2);border-bottom:2px solid var(--border);
@@ -159,6 +162,21 @@
   .gantt-v .block .resize-handle.top{top:-3px;}
   .gantt-v .block .resize-handle.bottom{bottom:-3px;}
   .gantt-v .block.dragging{opacity:.85;z-index:5;box-shadow:0 3px 10px #0008;}
+  .gantt-v .block.duplicating{outline:2px dashed var(--accent2);outline-offset:1px;cursor:copy;}
+  .unscheduled-tray{border:1px dashed var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--panel2);}
+  .unscheduled-tray-label{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .unscheduled-tray-list{display:flex;flex-wrap:wrap;gap:8px;}
+  .unscheduled-chip{
+    background:#fff;border:1px dashed var(--accent2);border-radius:16px;padding:5px 12px;
+    font-size:12px;cursor:grab;touch-action:none;user-select:none;
+  }
+  .unscheduled-chip:active{cursor:grabbing;}
+  .unscheduled-ghost{
+    position:fixed;top:0;left:0;z-index:100;pointer-events:none;
+    background:var(--accent2);color:#fff;border-radius:14px;padding:5px 12px;font-size:12px;
+    box-shadow:0 3px 10px #0006;opacity:.9;
+  }
+  @media print{ .unscheduled-tray{ display:none !important; } }
 
   /* ---- Print / image-export shared styling ----
      Colors below are driven by CSS custom properties so the output can be
@@ -513,6 +531,17 @@
           </div>
         </div>
       </div>
+      <div class="grid cols2" style="margin-top:10px;">
+        <div>
+          <label>出力するステージ（ライブ用）</label>
+          <div id="printStageChecks" class="chip-list"></div>
+        </div>
+        <div>
+          <label>出力する特典会場（特典会用）</label>
+          <div id="printTokutenChecks" class="chip-list"></div>
+        </div>
+      </div>
+      <p class="helptext" style="margin-top:-4px;">特定のステージ・特典会場だけにチェックを絞ると、そのステージ／会場だけの進行表を出力できます（各会場に配布する用の1枚など）。</p>
       <p class="helptext">
         下のボタンを押すと印刷ダイアログが開きます。印刷先を「PDFに保存」にすると、そのままPDFファイルとして出力できます（A4縦向き）。<br>
         時間軸を縦（上→下）、ステージ／特典会場を横並びの列にしたレイアウトで、DAYごと・種別ごとに1ページずつ出力されます。開催時間が長い場合は自動で文字を縮小して1ページに収めようとしますが、収まらない場合は続きのページに続きます。<br>
@@ -530,6 +559,16 @@
       <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text);margin-bottom:10px;"><input type="checkbox" id="chkPngTransparent" checked style="width:auto;"> 背景を透明にする（チェックを外すと、下で設定した背景色を使用します）</label>
       <button class="btn secondary" id="btnExportPng" style="font-size:15px;padding:12px 22px;">PNG画像で保存する</button>
       <div class="helptext" id="pngExportStatus" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Excelファイルとして出力</h2>
+      <p class="helptext">
+        上で選択したDAYごとに「ライブ」「特典会」のシートに分けて、時間軸どおりのガント形式でExcelファイル（.xlsx）を書き出します。まっさらなExcelブックにタイムテーブルをそのまま貼り付けたい場合や、既存のExcel運用と組み合わせたい場合にお使いください（PDF出力・PNG画像出力とは別の仕組みで、初回利用時にライブラリをインターネットから読み込みます）。<br>
+        アーティスト名のセルは出演時間の長さに応じて自動で結合され、可能な範囲でアーティストごとの色も再現します（お使いのExcel／表計算ソフトによっては、色が反映されない場合があります）。ステージ・特典会場の順番は「①基本設定」タブでの並び順がそのまま列の順番になります。
+      </p>
+      <button class="btn secondary" id="btnExportXlsx" style="font-size:15px;padding:12px 22px;">Excelファイルを保存する</button>
+      <div class="helptext" id="xlsxExportStatus" style="margin-top:8px;"></div>
     </div>
 
     <div class="card">
@@ -1498,56 +1537,59 @@
   }
 
   // ---------- Rendering: settings tab ----------
+  // Renders a reorderable chip list (used for stages, tokuten spots, green
+  // rooms) into containerEl. list is the live array in `state` (mutated in
+  // place so array order = display/lane order everywhere else in the app).
+  // usageCheck(item) returns true if some artist currently references this
+  // item, used to warn before a destructive delete.
+  function renderReorderableChipList(containerEl, list, usageCheck, onUnassign){
+    containerEl.innerHTML = "";
+    list.forEach((s, idx)=>{
+      const chip = document.createElement("div"); chip.className="chip";
+      chip.innerHTML = `<button class="chip-move" data-dir="up" title="前に移動" ${idx===0?"disabled":""}>▲</button>`+
+        `<button class="chip-move" data-dir="down" title="後ろに移動" ${idx===list.length-1?"disabled":""}>▼</button>`+
+        `<input type="text" value="${escapeAttr(s.name)}"><button class="chip-del" title="削除">✕</button>`;
+      chip.querySelector("input").addEventListener("change", e=>{ s.name=e.target.value.trim()||s.name; saveState(); renderAll(); });
+      chip.querySelectorAll(".chip-move").forEach(btn=>{
+        btn.addEventListener("click", ()=>{
+          const dir = btn.dataset.dir==="up" ? -1 : 1;
+          const swapWith = idx+dir;
+          if(swapWith<0 || swapWith>=list.length) return;
+          [list[idx], list[swapWith]] = [list[swapWith], list[idx]];
+          saveState(); renderAll();
+        });
+      });
+      chip.querySelector(".chip-del").addEventListener("click", ()=>{
+        if(usageCheck(s) && !confirm("これを使用しているアーティストがいます。削除すると割当が解除されます。よろしいですか？")) return;
+        list.splice(idx, 1);
+        onUnassign(s);
+        saveState(); renderAll();
+      });
+      containerEl.appendChild(chip);
+    });
+  }
+
   function renderSettings(){
     document.getElementById("evName").value = state.event.name||"";
     document.getElementById("evVenue").value = state.event.venue||"";
     document.getElementById("evAdminPin").value = state.event.adminPin||"";
     renderDayCards();
 
-    const stageChips = document.getElementById("stageChips");
-    stageChips.innerHTML = "";
-    state.stages.forEach(s=>{
-      const chip = document.createElement("div"); chip.className="chip";
-      chip.innerHTML = `<input type="text" value="${escapeAttr(s.name)}"><button title="削除">✕</button>`;
-      chip.querySelector("input").addEventListener("change", e=>{ s.name=e.target.value.trim()||s.name; saveState(); renderAll(); });
-      chip.querySelector("button").addEventListener("click", ()=>{
-        if(state.artists.some(a=>a.stageId===s.id) && !confirm("このステージを使用しているアーティストがいます。削除すると割当が解除されます。よろしいですか？")) return;
-        state.stages = state.stages.filter(x=>x.id!==s.id);
-        state.artists.forEach(a=>{ if(a.stageId===s.id) a.stageId=""; });
-        saveState(); renderAll();
-      });
-      stageChips.appendChild(chip);
-    });
-
-    const tokutenChips = document.getElementById("tokutenChips");
-    tokutenChips.innerHTML = "";
-    state.tokutenSpots.forEach(s=>{
-      const chip = document.createElement("div"); chip.className="chip";
-      chip.innerHTML = `<input type="text" value="${escapeAttr(s.name)}"><button title="削除">✕</button>`;
-      chip.querySelector("input").addEventListener("change", e=>{ s.name=e.target.value.trim()||s.name; saveState(); renderAll(); });
-      chip.querySelector("button").addEventListener("click", ()=>{
-        if(state.artists.some(a=>a.tokutenSpotId===s.id) && !confirm("この特典会場を使用しているアーティストがいます。削除すると割当が解除されます。よろしいですか？")) return;
-        state.tokutenSpots = state.tokutenSpots.filter(x=>x.id!==s.id);
-        state.artists.forEach(a=>{ if(a.tokutenSpotId===s.id) a.tokutenSpotId=""; });
-        saveState(); renderAll();
-      });
-      tokutenChips.appendChild(chip);
-    });
-
-    const greenRoomChips = document.getElementById("greenRoomChips");
-    greenRoomChips.innerHTML = "";
-    state.greenRooms.forEach(s=>{
-      const chip = document.createElement("div"); chip.className="chip";
-      chip.innerHTML = `<input type="text" value="${escapeAttr(s.name)}"><button title="削除">✕</button>`;
-      chip.querySelector("input").addEventListener("change", e=>{ s.name=e.target.value.trim()||s.name; saveState(); renderAll(); });
-      chip.querySelector("button").addEventListener("click", ()=>{
-        if(state.artists.some(a=>a.greenRoomId===s.id) && !confirm("この楽屋を使用しているアーティストがいます。削除すると割当が解除されます。よろしいですか？")) return;
-        state.greenRooms = state.greenRooms.filter(x=>x.id!==s.id);
-        state.artists.forEach(a=>{ if(a.greenRoomId===s.id) a.greenRoomId=""; });
-        saveState(); renderAll();
-      });
-      greenRoomChips.appendChild(chip);
-    });
+    renderReorderableChipList(
+      document.getElementById("stageChips"), state.stages,
+      s=>state.artists.some(a=>a.stageId===s.id),
+      s=>state.artists.forEach(a=>{ if(a.stageId===s.id) a.stageId=""; })
+    );
+    renderReorderableChipList(
+      document.getElementById("tokutenChips"), state.tokutenSpots,
+      s=>state.artists.some(a=>a.tokutenSpotId===s.id),
+      s=>state.artists.forEach(a=>{ if(a.tokutenSpotId===s.id) a.tokutenSpotId=""; })
+    );
+    renderReorderableChipList(
+      document.getElementById("greenRoomChips"), state.greenRooms,
+      s=>state.artists.some(a=>a.greenRoomId===s.id),
+      s=>state.artists.forEach(a=>{ if(a.greenRoomId===s.id) a.greenRoomId=""; })
+    );
   }
 
   function renderDayCards(){
@@ -1960,6 +2002,7 @@
     let pendingStart = null, pendingEnd = null;
     let origLaneId = null, hoverLaneId = null;
     let laneRects = null; // { [laneId]: DOMRect } captured once at drag start
+    let duplicateMode = false; // Alt/Option held at drag start: drop creates a copy instead of moving the original
 
     function laneAtX(clientX){
       if(!laneRects || laneOrderIds.length===0) return origLaneId;
@@ -2017,6 +2060,7 @@
     function endDrag(){
       if(!dragMode) return;
       block.classList.remove("dragging");
+      block.classList.remove("duplicating");
       if(hoverLaneId && laneTrackEls[hoverLaneId]) laneTrackEls[hoverLaneId].classList.remove("drag-hover");
       if(pointerId!=null && block.releasePointerCapture){
         try{ block.releasePointerCapture(pointerId); }catch(e){/* noop */}
@@ -2026,12 +2070,26 @@
       document.removeEventListener("pointercancel", onPointerUp);
       const timeChanged = pendingStart!=null && pendingEnd!=null && (pendingStart!==origStartMin || pendingEnd!==origEndMin);
       const laneChanged = dragMode==="move" && hoverLaneId && hoverLaneId!==origLaneId;
-      dragMode = null;
+      const wasDuplicate = duplicateMode;
+      dragMode = null; duplicateMode = false;
       if(timeChanged || laneChanged){
-        artist[startKey] = minToTime(pendingStart);
-        artist[endKey] = minToTime(pendingEnd);
-        if(laneChanged) artist[laneKey] = hoverLaneId;
-        syncDurationFromTimes(artist, kind);
+        if(wasDuplicate){
+          // Leave the original artist completely untouched; create a new
+          // artist (same name/color/other fields) at the dropped position.
+          // Re-render will naturally snap this block back to the original's
+          // unchanged position while the new block appears at the drop spot.
+          const clone = Object.assign({}, artist, { id: uid() });
+          clone[startKey] = minToTime(pendingStart);
+          clone[endKey] = minToTime(pendingEnd);
+          if(laneChanged) clone[laneKey] = hoverLaneId;
+          syncDurationFromTimes(clone, kind);
+          state.artists.push(clone);
+        } else {
+          artist[startKey] = minToTime(pendingStart);
+          artist[endKey] = minToTime(pendingEnd);
+          if(laneChanged) artist[laneKey] = hoverLaneId;
+          syncDurationFromTimes(artist, kind);
+        }
         saveState();
         renderAll();
       }
@@ -2044,6 +2102,7 @@
         ev.preventDefault();
         ev.stopPropagation();
         dragMode = mode;
+        duplicateMode = (mode==="move") && !!ev.altKey;
         dragStartY = ev.clientY||0;
         origStartMin = timeToMin(artist[startKey]);
         origEndMin = timeToMin(artist[endKey]);
@@ -2058,6 +2117,7 @@
           });
         }
         block.classList.add("dragging");
+        if(duplicateMode) block.classList.add("duplicating");
         if(pointerId!=null && block.setPointerCapture){
           try{ block.setPointerCapture(pointerId); }catch(e){/* noop */}
         }
@@ -2078,12 +2138,89 @@
     block.appendChild(handleBottom);
   }
 
+  // Drag handler for "unscheduled" tray chips: dragging one onto a lane
+  // track sets that artist's lane + start/end time from the drop position,
+  // using the same pxPerMin/startMinOfChart coordinate system as the gantt
+  // itself. Uses a floating ghost (not the chip) since the chip needs to
+  // stay in the tray's normal document flow throughout the drag.
+  function attachUnscheduledChipDragHandlers(chip, artist, kind, pxPerMin, startMinOfChart, laneTrackEls, laneOrderIds, wrapEl){
+    const laneKey = kind==="live" ? "stageId" : "tokutenSpotId";
+    const startKey = kind==="live" ? "liveStart" : "tokutenStart";
+    const endKey = kind==="live" ? "liveEnd" : "tokutenEnd";
+    const durKey = kind==="live" ? "durationMin" : "tokutenDurationMin";
+    let ghost = null, pointerId = null, hoverLaneId = null, laneRects = null;
+
+    function laneAt(clientX, clientY){
+      if(!laneRects) return null;
+      for(const id of laneOrderIds){
+        const r = laneRects[id];
+        if(r && clientX>=r.left && clientX<r.right && clientY>=r.top && clientY<r.bottom+100000) return id;
+      }
+      return null;
+    }
+
+    function onPointerMove(ev){
+      if(!ghost) return;
+      ghost.style.left = (ev.clientX+10)+"px";
+      ghost.style.top = (ev.clientY+10)+"px";
+      const targetLaneId = laneAt(ev.clientX, ev.clientY);
+      if(targetLaneId!==hoverLaneId){
+        if(hoverLaneId && laneTrackEls[hoverLaneId]) laneTrackEls[hoverLaneId].classList.remove("drag-hover");
+        if(targetLaneId && laneTrackEls[targetLaneId]) laneTrackEls[targetLaneId].classList.add("drag-hover");
+        hoverLaneId = targetLaneId;
+      }
+    }
+    function cleanup(){
+      if(ghost){ ghost.remove(); ghost = null; }
+      if(hoverLaneId && laneTrackEls[hoverLaneId]) laneTrackEls[hoverLaneId].classList.remove("drag-hover");
+      hoverLaneId = null;
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+      document.removeEventListener("pointercancel", onPointerUp);
+    }
+    function onPointerUp(ev){
+      const targetLaneId = laneAt(ev.clientX, ev.clientY);
+      cleanup();
+      if(!targetLaneId) return; // dropped outside any lane: leave it unscheduled
+      const track = laneTrackEls[targetLaneId];
+      const rect = track.getBoundingClientRect();
+      const y = ev.clientY - rect.top;
+      const rawMin = startMinOfChart + y/pxPerMin;
+      let start = Math.round(rawMin/DRAG_SNAP_MIN)*DRAG_SNAP_MIN;
+      if(start<0) start = 0;
+      const dur = parseInt(artist[durKey],10) > 0 ? parseInt(artist[durKey],10) : 20;
+      artist[laneKey] = targetLaneId;
+      artist[startKey] = minToTime(start);
+      artist[endKey] = minToTime(start+dur);
+      if(!artist[durKey]) artist[durKey] = String(dur);
+      saveState();
+      renderAll();
+    }
+
+    chip.addEventListener("pointerdown", ev=>{
+      if(ev.button!=null && ev.button!==0) return;
+      ev.preventDefault();
+      pointerId = ev.pointerId;
+      laneRects = {};
+      laneOrderIds.forEach(id=>{ const el = laneTrackEls[id]; if(el) laneRects[id] = el.getBoundingClientRect(); });
+      ghost = document.createElement("div");
+      ghost.className = "unscheduled-ghost";
+      ghost.textContent = artist.name;
+      ghost.style.left = (ev.clientX+10)+"px";
+      ghost.style.top = (ev.clientY+10)+"px";
+      document.body.appendChild(ghost);
+      document.addEventListener("pointermove", onPointerMove);
+      document.addEventListener("pointerup", onPointerUp);
+      document.addEventListener("pointercancel", cleanup);
+    });
+  }
+
   // ---------- Vertical Gantt rendering ----------
   // time axis flows top -> bottom; lanes (stages / tokuten spots) are side-by-side columns
   function renderGanttInto(container, kind, dayId, opts){
     opts = opts || {};
     const day = byId(state.days, dayId);
-    const lanes = kind==="live" ? state.stages : state.tokutenSpots;
+    const lanes = (kind==="live" ? state.stages : state.tokutenSpots).filter(l=> !opts.laneFilter || opts.laneFilter.has(l.id));
     const laneKey = kind==="live" ? "stageId" : "tokutenSpotId";
     const startKey = kind==="live" ? "liveStart" : "tokutenStart";
     const endKey = kind==="live" ? "liveEnd" : "tokutenEnd";
@@ -2095,7 +2232,10 @@
 
     container.innerHTML = "";
     if(lanes.length===0){
-      container.innerHTML = `<div class="helptext">${kind==="live"?"ステージ":"特典会場"}が登録されていません。「①基本設定」タブで追加してください。</div>`;
+      const totalLaneCount = (kind==="live" ? state.stages : state.tokutenSpots).length;
+      container.innerHTML = totalLaneCount===0
+        ? `<div class="helptext">${kind==="live"?"ステージ":"特典会場"}が登録されていません。「①基本設定」タブで追加してください。</div>`
+        : `<div class="helptext">出力対象のチェックが外れています。「⑥PDF出力」タブで${kind==="live"?"ステージ":"特典会場"}を1つ以上選択してください。</div>`;
       return;
     }
 
@@ -2176,7 +2316,7 @@
           block.style.height = Math.max((e-s)*pxPerMin-3,18)+"px";
           block.style.background = a.color;
           block.innerHTML = `<b>${escapeHtml(a.name)}</b><span class="t">${a[startKey]}–${a[endKey]}</span>`;
-          block.title = a.name+" "+a[startKey]+"〜"+a[endKey]+(a.memo?(" / "+a.memo):"")+(opts.interactive!==false ? "\n（ドラッグで移動／"+(kind==="live"?"ステージ":"特典会場")+"変更、上下端をドラッグで尺を変更できます）" : "");
+          block.title = a.name+" "+a[startKey]+"〜"+a[endKey]+(a.memo?(" / "+a.memo):"")+(opts.interactive!==false ? "\n（ドラッグで移動／"+(kind==="live"?"ステージ":"特典会場")+"変更、上下端をドラッグで尺を変更できます。Alt/Optionキーを押しながらドラッグすると複製されます）" : "");
           if(opts.interactive!==false){
             attachBlockDragHandlers(block, a, startKey, endKey, laneKey, kind, pxPerMin, startMin, laneTrackEls, laneOrderIds);
           }
@@ -2196,6 +2336,36 @@
     });
 
     container.appendChild(wrap);
+
+    // Unscheduled tray: artists for this day that don't yet have a valid
+    // start/end for this kind (live or tokuten), shown as draggable chips so
+    // they can be scheduled by dragging onto a lane instead of having to
+    // type a time into the table first. Skipped for non-interactive render
+    // (print/PNG export), since dragging doesn't apply there.
+    if(opts.interactive!==false){
+      const unscheduled = dayArtists.filter(a=>!isValidTime(a[startKey]) || !isValidTime(a[endKey]));
+      if(unscheduled.length>0){
+        const tray = document.createElement("div");
+        tray.className = "unscheduled-tray";
+        const label = document.createElement("div");
+        label.className = "unscheduled-tray-label";
+        label.textContent = "未設定（ドラッグして"+(kind==="live"?"ステージ":"特典会場")+"・時間を決める）：";
+        tray.appendChild(label);
+        const list = document.createElement("div");
+        list.className = "unscheduled-tray-list";
+        unscheduled.forEach(a=>{
+          const chip = document.createElement("div");
+          chip.className = "unscheduled-chip";
+          const laneNm = a[laneKey] ? (kind==="live" ? stageName(a[laneKey]) : tokutenName(a[laneKey])) : "";
+          chip.textContent = a.name + (laneNm ? "（"+laneNm+"）" : "");
+          chip.title = "ドラッグして"+(kind==="live"?"ステージ":"特典会場")+"・時間を設定";
+          attachUnscheduledChipDragHandlers(chip, a, kind, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+          list.appendChild(chip);
+        });
+        tray.appendChild(list);
+        container.insertBefore(tray, wrap);
+      }
+    }
   }
 
   function renderDaySection(wrapEl, kind, day, opts){
@@ -2215,7 +2385,7 @@
     }
     const sub = day.date ? (" ・ "+day.date) : "";
     section.innerHTML = `<h2>${escapeHtml(day.label)}${escapeHtml(sub)} － ${label}</h2>` + statusHtml +
-      `<div class="helptext">枠をドラッグすると時間の移動、隣の${laneWord}列へのドラッグで${laneWord}の変更ができます。枠の上下端をドラッグすると尺（長さ）を変更できます（いずれも5分刻み）。</div>` +
+      `<div class="helptext">枠をドラッグすると時間の移動、隣の${laneWord}列へのドラッグで${laneWord}の変更ができます。枠の上下端をドラッグすると尺（長さ）を変更できます（いずれも5分刻み）。Alt（Windows）／Option（Mac）キーを押しながらドラッグすると、その枠を複製できます（2回出演するアーティストなどに便利です）。</div>` +
       `<div class="gantt-v-wrap"></div>`;
     renderGanttInto(section.querySelector(".gantt-v-wrap"), kind, day.id, opts);
     wrapEl.appendChild(section);
@@ -2242,6 +2412,20 @@
       return `<label class="chip" style="cursor:pointer;"><input type="checkbox" class="printDayChk" value="${d.id}" ${checked?"checked":""} style="width:auto;margin-right:6px;">${escapeHtml(d.label)}</label>`;
     }).join("");
   }
+  // Shared by the stage-filter and tokuten-spot-filter checklists in the PDF
+  // output tab, so a specific stage/venue's own copy can be printed alone.
+  function renderPrintLaneChecks(containerId, checkClass, lanes){
+    const wrap = document.getElementById(containerId);
+    const prevChecked = {};
+    wrap.querySelectorAll("."+checkClass).forEach(c=>{ prevChecked[c.value]=c.checked; });
+    if(lanes.length===0){ wrap.innerHTML = `<div class="helptext" style="margin:0;">未登録</div>`; return; }
+    wrap.innerHTML = lanes.map(l=>{
+      const checked = (l.id in prevChecked) ? prevChecked[l.id] : true;
+      return `<label class="chip" style="cursor:pointer;"><input type="checkbox" class="${checkClass}" value="${l.id}" ${checked?"checked":""} style="width:auto;margin-right:6px;">${escapeHtml(l.name)}</label>`;
+    }).join("");
+  }
+  function renderPrintStageChecks(){ renderPrintLaneChecks("printStageChecks", "printStageChk", state.stages); }
+  function renderPrintTokutenChecks(){ renderPrintLaneChecks("printTokutenChecks", "printTokutenChk", state.tokutenSpots); }
 
   // Renders the preset chips + individual color pickers in the output tab,
   // and keeps them in sync with state.printStyle (e.g. after a backup import).
@@ -2340,6 +2524,14 @@
     const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
     const includeLive = document.getElementById("chkPrintLive").checked;
     const includeTokuten = document.getElementById("chkPrintTokuten").checked;
+    const selectedStageIds = Array.from(document.querySelectorAll(".printStageChk:checked")).map(c=>c.value);
+    const selectedTokutenIds = Array.from(document.querySelectorAll(".printTokutenChk:checked")).map(c=>c.value);
+    const stageFilter = selectedStageIds.length < state.stages.length ? new Set(selectedStageIds) : null;
+    const tokutenFilter = selectedTokutenIds.length < state.tokutenSpots.length ? new Set(selectedTokutenIds) : null;
+    // When the selection is narrowed to specific lanes, note that in the page
+    // title too, so a sheet printed for one stage is clearly labeled as such.
+    const stageSuffix = stageFilter ? "（"+state.stages.filter(s=>stageFilter.has(s.id)).map(s=>s.name).join("・")+"）" : "";
+    const tokutenSuffix = tokutenFilter ? "（"+state.tokutenSpots.filter(s=>tokutenFilter.has(s.id)).map(s=>s.name).join("・")+"）" : "";
     const evName = state.event.name || "（イベント名未設定）";
     const evVenue = state.event.venue || "";
 
@@ -2360,8 +2552,8 @@
     }
 
     state.days.filter(d=>selectedDayIds.includes(d.id)).forEach(day=>{
-      if(includeLive) renderGanttInto(page(day,"ライブタイムテーブル"), "live", day.id, {fitHeightPx: PRINT_HEIGHT_BUDGET, interactive:false});
-      if(includeTokuten) renderGanttInto(page(day,"特典会タイムテーブル"), "tokuten", day.id, {fitHeightPx: PRINT_HEIGHT_BUDGET, interactive:false});
+      if(includeLive) renderGanttInto(page(day,"ライブタイムテーブル"+stageSuffix), "live", day.id, {fitHeightPx: PRINT_HEIGHT_BUDGET, interactive:false, laneFilter: stageFilter});
+      if(includeTokuten) renderGanttInto(page(day,"特典会タイムテーブル"+tokutenSuffix), "tokuten", day.id, {fitHeightPx: PRINT_HEIGHT_BUDGET, interactive:false, laneFilter: tokutenFilter});
     });
 
     if(area.children.length===0){
@@ -2402,14 +2594,200 @@
     return html2canvasScriptPromise;
   }
 
+  // ---------- Excel (.xlsx) export: a real gantt-shaped spreadsheet, not just a flat CSV ----------
+  // Uses xlsx-populate (loaded from CDN, like html2canvas) since it supports
+  // writing cell fills/merges/row heights client-side for free, unlike the
+  // more common SheetJS "xlsx" package whose free tier can't write styles.
+  let xlsxPopulateScriptPromise = null;
+  function loadXlsxPopulateScript(){
+    if(window.XlsxPopulate) return Promise.resolve();
+    if(xlsxPopulateScriptPromise) return xlsxPopulateScriptPromise;
+    xlsxPopulateScriptPromise = new Promise((resolve,reject)=>{
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/xlsx-populate@1.21.0/browser/xlsx-populate.min.js";
+      s.onload = ()=>resolve();
+      s.onerror = ()=>{ xlsxPopulateScriptPromise=null; reject(new Error("load failed")); };
+      document.head.appendChild(s);
+    });
+    return xlsxPopulateScriptPromise;
+  }
+  // Excel sheet names: max 31 chars, and : \ / ? * [ ] are not allowed.
+  function sanitizeSheetName(name){
+    let n = String(name||"Sheet").replace(/[:\\/?*\[\]]/g, "_").trim();
+    if(n.length>31) n = n.slice(0,31);
+    return n || "Sheet";
+  }
+  // Applies a style and silently ignores failures, so an unexpected argument
+  // (or a future library version with a slightly different API) degrades to
+  // "correct data, plain formatting" instead of aborting the whole export.
+  function safeStyle(target, name, value){
+    try{ target.style(name, value); }catch(e){ /* keep the data, skip the style */ }
+  }
+  // Collects the lanes + time breakpoints needed to lay out one DAY+kind as a
+  // spreadsheet gantt. Breakpoints are every distinct start/end (+ changeover
+  // end) minute across that day's artists, so each spreadsheet row matches an
+  // actual boundary in the data rather than an arbitrary fixed increment.
+  function buildXlsxSheetData(day, kind){
+    const lanes = kind==="live" ? state.stages : state.tokutenSpots;
+    const laneKey = kind==="live" ? "stageId" : "tokutenSpotId";
+    const startKey = kind==="live" ? "liveStart" : "tokutenStart";
+    const endKey = kind==="live" ? "liveEnd" : "tokutenEnd";
+    const dayArtists = state.artists.filter(a=>a.dayId===day.id && a[laneKey] && isValidTime(a[startKey]) && isValidTime(a[endKey]));
+    let mins = [];
+    dayArtists.forEach(a=>{
+      mins.push(timeToMin(a[startKey]));
+      const changeover = (kind==="live") ? (parseInt(a.changeoverMin,10)||0) : 0;
+      mins.push(timeToMin(a[endKey]) + changeover);
+    });
+    const defStart = kind==="live" ? day.liveStart : day.tokutenStart;
+    const defEnd = kind==="live" ? day.liveEnd : day.tokutenEnd;
+    if(isValidTime(defStart)) mins.push(timeToMin(defStart));
+    if(isValidTime(defEnd)) mins.push(timeToMin(defEnd));
+    if(mins.length===0) mins = [600,1200];
+    let breakpoints = Array.from(new Set(mins)).sort((x,y)=>x-y);
+    if(breakpoints.length<2) breakpoints = [breakpoints[0], breakpoints[0]+60];
+    return { lanes, laneKey, startKey, endKey, dayArtists, breakpoints };
+  }
+
+  async function exportXlsx(){
+    const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
+    const days = state.days.filter(d=>selectedDayIds.includes(d.id));
+    if(days.length===0){
+      alert("出力するDAYを、上の「出力するDAY」から選択してください。");
+      return;
+    }
+
+    const statusEl = document.getElementById("xlsxExportStatus");
+    const btn = document.getElementById("btnExportXlsx");
+    btn.disabled = true;
+    if(statusEl) statusEl.textContent = "準備中…（初回はライブラリの読み込みに時間がかかることがあります）";
+    try{
+      await loadXlsxPopulateScript();
+    }catch(e){
+      if(statusEl) statusEl.textContent = "";
+      alert("Excel書き出しに必要なライブラリの読み込みに失敗しました。インターネット接続を確認してください。");
+      btn.disabled = false;
+      return;
+    }
+
+    try{
+      if(statusEl) statusEl.textContent = "Excelファイルを作成中…";
+      const workbook = await window.XlsxPopulate.fromBlankAsync();
+      const usedNames = new Set();
+      function uniqueSheetName(base){
+        let name = sanitizeSheetName(base);
+        let candidate = name, n = 2;
+        while(usedNames.has(candidate)){
+          const suffix = "_"+n;
+          candidate = sanitizeSheetName(name.slice(0, 31-suffix.length)+suffix);
+          n++;
+        }
+        usedNames.add(candidate);
+        return candidate;
+      }
+
+      let sheetIndex = 0;
+      days.forEach(day=>{
+        ["live","tokuten"].forEach(kind=>{
+          const sheetName = uniqueSheetName(day.label + (kind==="live" ? "ライブ" : "特典会"));
+          const sheet = sheetIndex===0 ? workbook.sheet(0).name(sheetName) : workbook.addSheet(sheetName);
+          sheetIndex++;
+          const { lanes, laneKey, startKey, endKey, dayArtists, breakpoints } = buildXlsxSheetData(day, kind);
+
+          // Header row: time-axis column + one column per lane, in the
+          // same order as「①基本設定」タブ (state.stages / state.tokutenSpots).
+          const headerCell = sheet.cell(1,1);
+          headerCell.value("時刻");
+          safeStyle(headerCell, "bold", true);
+          safeStyle(headerCell, "fill", "DDDDDD");
+          sheet.column(1).width(14);
+          lanes.forEach((lane, li)=>{
+            const c = sheet.cell(1, 2+li);
+            c.value(lane.name);
+            safeStyle(c, "bold", true);
+            safeStyle(c, "fill", "DDDDDD");
+            sheet.column(2+li).width(22);
+          });
+
+          // Time-axis rows, with row height roughly proportional to the
+          // segment's duration so the sheet still reads like a gantt chart.
+          for(let i=0;i<breakpoints.length-1;i++){
+            const rowIdx = 2+i;
+            const t0 = breakpoints[i], t1 = breakpoints[i+1];
+            const timeCell = sheet.cell(rowIdx,1);
+            timeCell.value(minToTime(t0)+"–"+minToTime(t1));
+            safeStyle(timeCell, "fontColor", "888888");
+            try{ sheet.row(rowIdx).height(Math.max(14, Math.min(120, (t1-t0)*0.6))); }catch(e){/* noop */}
+          }
+
+          // Artist blocks: merge the lane's column across every row the
+          // block spans, with a best-effort fill matching the artist's color.
+          lanes.forEach((lane, li)=>{
+            const col = 2+li;
+            dayArtists.filter(a=>a[laneKey]===lane.id).forEach(a=>{
+              try{
+                const s = timeToMin(a[startKey]), e = timeToMin(a[endKey]);
+                const startIdx = breakpoints.indexOf(s), endIdx = breakpoints.indexOf(e);
+                if(startIdx===-1 || endIdx===-1 || endIdx<=startIdx) return;
+                const rowStart = 2+startIdx, rowEnd = 2+endIdx-1;
+                const cell = sheet.cell(rowStart, col);
+                cell.value(a.name+"\n"+a[startKey]+"–"+a[endKey]);
+                if(rowEnd>rowStart) sheet.range(rowStart,col,rowEnd,col).merged(true);
+                safeStyle(cell, "wrapText", true);
+                safeStyle(cell, "verticalAlignment", "center");
+                const hex = (a.color||"").replace("#","").toUpperCase();
+                if(/^[0-9A-F]{6}$/.test(hex)) safeStyle(cell, "fill", hex);
+
+                const changeover = (kind==="live") ? (parseInt(a.changeoverMin,10)||0) : 0;
+                if(changeover>0){
+                  const coStartIdx = breakpoints.indexOf(e), coEndIdx = breakpoints.indexOf(e+changeover);
+                  if(coStartIdx!==-1 && coEndIdx!==-1 && coEndIdx>coStartIdx){
+                    const coRowStart = 2+coStartIdx, coRowEnd = 2+coEndIdx-1;
+                    const coCell = sheet.cell(coRowStart, col);
+                    coCell.value("転換");
+                    if(coRowEnd>coRowStart) sheet.range(coRowStart,col,coRowEnd,col).merged(true);
+                    safeStyle(coCell, "fill", "EEEEEE");
+                    safeStyle(coCell, "fontColor", "999999");
+                  }
+                }
+              }catch(e){ /* skip this one artist rather than aborting the whole sheet */ }
+            });
+          });
+
+          try{ sheet.range(1,1,1+breakpoints.length-1, 1+lanes.length).style("border", true); }catch(e){/* noop */}
+        });
+      });
+
+      const blob = await workbook.outputAsync();
+      const url = URL.createObjectURL(blob);
+      const fname = (state.event.name||"timetable").replace(/[\\/:*?"<>|]/g,"_")+"_タイムテーブル.xlsx";
+      const a = document.createElement("a");
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+      if(statusEl) statusEl.textContent = `完了：${sheetIndex}枚のシートを含むExcelファイルを書き出しました。`;
+    }catch(err){
+      if(statusEl) statusEl.textContent = "";
+      alert("Excelファイルの書き出し中にエラーが発生しました。");
+    }finally{
+      btn.disabled = false;
+    }
+  }
+
   async function exportPng(){
     const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
     const includeLive = document.getElementById("chkPrintLive").checked;
     const includeTokuten = document.getElementById("chkPrintTokuten").checked;
+    const selectedStageIds = Array.from(document.querySelectorAll(".printStageChk:checked")).map(c=>c.value);
+    const selectedTokutenIds = Array.from(document.querySelectorAll(".printTokutenChk:checked")).map(c=>c.value);
+    const stageFilter = selectedStageIds.length < state.stages.length ? new Set(selectedStageIds) : null;
+    const tokutenFilter = selectedTokutenIds.length < state.tokutenSpots.length ? new Set(selectedTokutenIds) : null;
+    const stageSuffix = stageFilter ? "（"+state.stages.filter(s=>stageFilter.has(s.id)).map(s=>s.name).join("・")+"）" : "";
+    const tokutenSuffix = tokutenFilter ? "（"+state.tokutenSpots.filter(s=>tokutenFilter.has(s.id)).map(s=>s.name).join("・")+"）" : "";
     const jobs = [];
     state.days.filter(d=>selectedDayIds.includes(d.id)).forEach(day=>{
-      if(includeLive) jobs.push({day, kind:"live", title:"ライブタイムテーブル"});
-      if(includeTokuten) jobs.push({day, kind:"tokuten", title:"特典会タイムテーブル"});
+      if(includeLive) jobs.push({day, kind:"live", title:"ライブタイムテーブル"+stageSuffix, laneFilter: stageFilter});
+      if(includeTokuten) jobs.push({day, kind:"tokuten", title:"特典会タイムテーブル"+tokutenSuffix, laneFilter: tokutenFilter});
     });
     if(jobs.length===0){
       alert("出力するDAYとタイムテーブル種別を、上の「出力するDAY」「出力するタイムテーブル種別」から選択してください。");
@@ -2459,7 +2837,7 @@
         gantt.className = "gantt-v-wrap";
         p.appendChild(h); p.appendChild(sub); p.appendChild(gantt);
         scratch.appendChild(p);
-        renderGanttInto(gantt, job.kind, job.day.id, {interactive:false});
+        renderGanttInto(gantt, job.kind, job.day.id, {interactive:false, laneFilter: job.laneFilter});
 
         const canvas = await window.html2canvas(p, { backgroundColor: transparent ? null : undefined, scale:2, useCORS:true });
         const blob = await new Promise(res=>canvas.toBlob(res, "image/png"));
@@ -2481,6 +2859,7 @@
     }
   }
   document.getElementById("btnExportPng").addEventListener("click", exportPng);
+  document.getElementById("btnExportXlsx").addEventListener("click", exportXlsx);
 
   // ---------- Stats (動員数・チケット売上・イベンター好感度の集計) ----------
   function computeDayTotals(dayId){
@@ -2801,6 +3180,8 @@
     renderLiveTab();
     renderTokutenTab();
     renderPrintDayChecks();
+    renderPrintStageChecks();
+    renderPrintTokutenChecks();
     renderPrintStyleControls();
     renderStatsTab();
     renderArtistNameList();
