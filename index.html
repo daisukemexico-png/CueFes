@@ -40,6 +40,32 @@
   nav.tabs button.clock-tab.active{color:var(--accent2);border-bottom-color:var(--accent2);}
   main{padding:20px 24px 64px;max-width:1400px;margin:0 auto;}
   .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;box-shadow:var(--shadow-sm);}
+  .home-hero{text-align:center;padding:28px 16px 8px;}
+  .home-hero img{height:56px;margin-bottom:14px;}
+  .home-hero h1{font-size:22px;margin:0 0 8px;color:var(--text);}
+  .home-hero p{color:var(--muted);font-size:14px;max-width:640px;margin:0 auto;line-height:1.7;}
+  .home-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;
+    padding:20px 4px 8px;
+  }
+  .home-card{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:16px 18px;cursor:pointer;box-shadow:var(--shadow-sm);
+    transition:transform .12s,box-shadow .12s,border-color .12s;
+    display:flex;flex-direction:column;gap:6px;
+  }
+  .home-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-md);border-color:var(--accent2);}
+  .home-card:focus-visible{outline:2px solid var(--accent2);outline-offset:2px;}
+  .home-card-num{
+    width:30px;height:30px;border-radius:50%;background:var(--accent-soft);color:var(--accent-ink);
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;
+  }
+  .home-card h3{font-size:14.5px;margin:2px 0 0;color:var(--text);}
+  .home-card p{font-size:12.5px;color:var(--muted);margin:0;line-height:1.6;flex:1;}
+  .home-card .home-card-badge{
+    align-self:flex-start;font-size:10.5px;color:var(--warn);background:#a6650a12;
+    border-radius:10px;padding:2px 8px;margin-top:2px;
+  }
   .card h2{margin:0 0 14px;font-size:14.5px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;}
   .card h2::before{content:"";width:5px;height:14px;border-radius:2px;background:var(--accent2);display:inline-block;}
   .grid{display:grid;gap:12px;}
@@ -222,7 +248,7 @@
 
 <header class="appbar">
   <div class="brand">
-    <img class="mark" id="hdrTitle" alt="CueFes" height="34" src="data:image/png;base64,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">
+    <img class="mark" id="hdrTitle" alt="CueFes" height="34" title="① 基本設定に戻る" style="cursor:pointer;" src="data:image/png;base64,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">
     <div class="wordmark">
       <div class="tagline">サーキット＆特典会 タイムテーブル管理</div>
     </div>
@@ -254,7 +280,7 @@
 <div class="storage-note">複数DAY対応／データはこのブラウザ内に自動保存されます（他の端末とは共有されません）</div>
 
 <nav class="tabs">
-  <button data-tab="settings" class="active">① 基本設定</button>
+  <button data-tab="settings">① 基本設定</button>
   <button data-tab="days">② DAY・時間設定</button>
   <button data-tab="artists">③ アーティスト管理</button>
   <button data-tab="live">④ ライブTT</button>
@@ -269,8 +295,20 @@
 
 <main>
 
+  <!-- ============ TAB: HOME (top page) ============ -->
+  <div class="tabcontent active" id="tab-home">
+    <div class="home-hero">
+      <img src="data:image/png;base64,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" alt="CueFes">
+      <h1>CueFesでできること</h1>
+      <p>アイドルフェスなどのサーキットイベントのタイムテーブルと進行表を、ブラウザだけで作成・管理できます。やりたいことをクリックすると、その画面に移動します。</p>
+    </div>
+    <div class="home-grid">
+      <div class="home-card" data-goto="settings" role="button" tabindex="0"><div class="home-card-num">①</div><h3>基本設定をする</h3><p>イベント名・会場、ステージ・特典会場・楽屋の名前を登録します。すべての作業の出発点です。</p></div><div class="home-card" data-goto="days" role="button" tabindex="0"><div class="home-card-num">②</div><h3>DAY・時間設定をする</h3><p>開催日数と、DAYごとのライブ・特典会の開催時間帯を設定します。</p></div><div class="home-card" data-goto="artists" role="button" tabindex="0"><div class="home-card-num">③</div><h3>出演者を登録する</h3><p>手動入力、CSV一括登録、テキスト／画像（OCR）からの取り込みで出演者を登録します。</p></div><div class="home-card" data-goto="live" role="button" tabindex="0"><div class="home-card-num">④</div><h3>ライブTTを組み立てる</h3><p>ドラッグ操作で、ライブのタイムテーブルを直接編集できます。</p></div><div class="home-card" data-goto="tokuten" role="button" tabindex="0"><div class="home-card-num">⑤</div><h3>特典会TTを組み立てる</h3><p>物販・チェキ・お見送りなど、特典会のタイムテーブルを組み立てます。</p></div><div class="home-card admin-field" data-goto="output" role="button" tabindex="0"><div class="home-card-num">⑥</div><h3>PDF・PNG・Excelで出力する</h3><p>配布用のPDF、透明PNG画像、時間軸どおりのExcelファイルとして書き出せます。</p><div class="home-card-badge">管理者専用</div></div><div class="home-card admin-field" data-goto="stats" role="button" tabindex="0"><div class="home-card-num">⑦</div><h3>実績を集計する</h3><p>動員数・チケット売上・イベンター好感度をDAY別・全体で自動集計します。</p><div class="home-card-badge">管理者専用</div></div><div class="home-card admin-field" data-goto="master" role="button" tabindex="0"><div class="home-card-num">⑧</div><h3>アーティストマスタを使う</h3><p>イベントをまたいで使う名簿から、今のイベントへ一括ブッキングできます。</p><div class="home-card-badge">管理者専用</div></div><div class="home-card admin-field" data-goto="contactsheet" role="button" tabindex="0"><div class="home-card-num">⑨</div><h3>出演者連絡シートを作る</h3><p>楽屋・入り時間・出演時間をまとめた、マネージャー宛の連絡文を自動作成します。</p><div class="home-card-badge">管理者専用</div></div><div class="home-card admin-field" data-goto="staffschedule" role="button" tabindex="0"><div class="home-card-num">⑩</div><h3>進行表を作る</h3><p>舞台監督・音響など担当ごとの、搬入から撤収までの裏方進行表を作成します。</p><div class="home-card-badge">管理者専用</div></div><div class="home-card" data-goto="clock" role="button" tabindex="0"><div class="home-card-num">•</div><h3>本番当日に使う</h3><p>現在時刻と、DAYごとの開演・終演までの残り時間を大きく表示します。</p></div>
+    </div>
+  </div>
+
   <!-- ============ TAB: SETTINGS ============ -->
-  <div class="tabcontent active" id="tab-settings">
+  <div class="tabcontent" id="tab-settings">
     <div class="card">
       <h2>イベント基本情報</h2>
       <div class="grid cols2">
@@ -3834,6 +3872,26 @@
       btn.classList.add("active");
       document.querySelectorAll(".tabcontent").forEach(t=>t.classList.remove("active"));
       document.getElementById("tab-"+btn.dataset.tab).classList.add("active");
+    });
+  });
+
+  // The home/top page isn't one of the nav.tabs buttons, so no nav button
+  // ever shows "active" while it's showing — clicking any tab, or a home
+  // card, moves away from it in the usual way.
+  function goHome(){
+    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tabcontent").forEach(t=>t.classList.remove("active"));
+    document.getElementById("tab-home").classList.add("active");
+  }
+  document.getElementById("hdrTitle").addEventListener("click", goHome);
+  document.querySelectorAll(".home-card").forEach(card=>{
+    const go = ()=>{
+      const btn = document.querySelector('nav.tabs button[data-tab="'+card.dataset.goto+'"]');
+      if(btn) btn.click();
+    };
+    card.addEventListener("click", go);
+    card.addEventListener("keydown", ev=>{
+      if(ev.key==="Enter" || ev.key===" "){ ev.preventDefault(); go(); }
     });
   });
 
