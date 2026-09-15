@@ -194,6 +194,18 @@
     opacity:.55;transition:opacity .1s;
   }
   .gantt-v .block:hover .block-copy-btn{opacity:1;}
+  .gantt-v .block .block-toolbar{
+    position:absolute;top:2px;left:2px;z-index:3;display:flex;gap:2px;
+  }
+  .gantt-v .block .block-toolbar button{
+    background:rgba(255,255,255,.85);border:1px solid #0002;border-radius:4px;
+    width:15px;height:15px;line-height:13px;text-align:center;padding:0;
+    font-size:9px;cursor:pointer;
+    opacity:.55;transition:opacity .1s;
+  }
+  .gantt-v .block:hover .block-toolbar button{opacity:1;}
+  .gantt-v .block .block-del-btn{color:var(--danger);}
+  .gantt-v .block .block-cut-btn{color:var(--warn);}
   .gantt-v .block.dragging{opacity:.85;z-index:5;box-shadow:0 3px 10px #0008;}
   .gantt-v .block.duplicating{outline:2px dashed var(--accent2);outline-offset:1px;cursor:copy;}
   .unscheduled-tray{border:1px dashed var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--panel2);}
@@ -2560,7 +2572,37 @@
         block.style.background = t.color || "#e0e0e0";
         block.innerHTML = `<b>${escapeHtml(t.label)}</b><span class="t">${t.start}–${t.end}</span>`;
         block.title = t.label+" "+t.start+"〜"+t.end+(t.memo?(" / "+t.memo):"")+(opts.interactive!==false ? "\n（ドラッグで移動／担当変更、上下端をドラッグで長さを変更できます。Alt/Optionキーを押しながらドラッグすると複製されます）" : "");
-        if(opts.interactive!==false) attachStaffBlockDragHandlers(block, t, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+        if(opts.interactive!==false){
+          attachStaffBlockDragHandlers(block, t, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+          const toolbar = document.createElement("div");
+          toolbar.className = "block-toolbar";
+          const cutBtn = document.createElement("button");
+          cutBtn.type = "button";
+          cutBtn.className = "block-cut-btn";
+          cutBtn.textContent = "✂";
+          cutBtn.title = "この作業の担当・時間の割り当てを切り取る（作業自体は削除されず、「未設定」に戻ります。あとでドラッグして置き直せます）";
+          cutBtn.addEventListener("pointerdown", ev=>ev.stopPropagation());
+          cutBtn.addEventListener("click", ev=>{
+            ev.preventDefault(); ev.stopPropagation();
+            t.start = ""; t.end = ""; t.laneId = "";
+            saveState(); renderAll();
+          });
+          toolbar.appendChild(cutBtn);
+          const delBtn = document.createElement("button");
+          delBtn.type = "button";
+          delBtn.className = "block-del-btn";
+          delBtn.textContent = "✕";
+          delBtn.title = "この作業を削除する";
+          delBtn.addEventListener("pointerdown", ev=>ev.stopPropagation());
+          delBtn.addEventListener("click", ev=>{
+            ev.preventDefault(); ev.stopPropagation();
+            if(!confirm(`「${t.label}」を削除しますか？`)) return;
+            state.staffTasks = state.staffTasks.filter(x=>x.id!==t.id);
+            saveState(); renderAll();
+          });
+          toolbar.appendChild(delBtn);
+          block.appendChild(toolbar);
+        }
         track.appendChild(block);
       });
     });
@@ -2793,6 +2835,34 @@
           block.title = a.name+" "+a[startKey]+"〜"+a[endKey]+(a.memo?(" / "+a.memo):"")+(opts.interactive!==false ? "\n（ドラッグで移動／"+(kind==="live"?"ステージ":"特典会場")+"変更、上下端をドラッグで尺を変更できます。Alt/Optionキーを押しながらドラッグすると複製されます）" : "");
           if(opts.interactive!==false){
             attachBlockDragHandlers(block, a, startKey, endKey, laneKey, kind, pxPerMin, startMin, laneTrackEls, laneOrderIds);
+            const toolbar = document.createElement("div");
+            toolbar.className = "block-toolbar";
+            const cutBtn = document.createElement("button");
+            cutBtn.type = "button";
+            cutBtn.className = "block-cut-btn";
+            cutBtn.textContent = "✂";
+            cutBtn.title = "この"+(kind==="live"?"ライブ":"特典会")+"の割り当てを切り取る（アーティスト自体は削除されず、「未設定」に戻ります。あとで別の"+(kind==="live"?"ステージ":"特典会場")+"・時間にドラッグして置き直せます）";
+            cutBtn.addEventListener("pointerdown", ev=>ev.stopPropagation());
+            cutBtn.addEventListener("click", ev=>{
+              ev.preventDefault(); ev.stopPropagation();
+              a[startKey] = ""; a[endKey] = ""; a[laneKey] = "";
+              saveState(); renderAll();
+            });
+            toolbar.appendChild(cutBtn);
+            const delBtn = document.createElement("button");
+            delBtn.type = "button";
+            delBtn.className = "block-del-btn";
+            delBtn.textContent = "✕";
+            delBtn.title = "このアーティストを削除する（ライブ・特典会どちらの予定も一緒に削除されます）";
+            delBtn.addEventListener("pointerdown", ev=>ev.stopPropagation());
+            delBtn.addEventListener("click", ev=>{
+              ev.preventDefault(); ev.stopPropagation();
+              if(!confirm(a.name+" を削除しますか？")) return;
+              state.artists = state.artists.filter(x=>x.id!==a.id);
+              saveState(); renderAll();
+            });
+            toolbar.appendChild(delBtn);
+            block.appendChild(toolbar);
             if(kind==="live"){
               const copyBtn = document.createElement("button");
               copyBtn.type = "button";
