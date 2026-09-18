@@ -98,6 +98,7 @@
   button.btn.ghost{background:transparent;color:var(--accent2);border:1px solid var(--accent2);}
   button.btn.ghost:hover{background:var(--accent2-soft);}
   button.btn.danger{background:transparent;color:var(--danger);border:1px solid var(--danger);}
+  #btnViewLockToggle.view-lock-active{background:var(--warn);color:#fff;border-color:var(--warn);}
   button.btn.danger:hover{background:#c81e3912;}
   button.btn:disabled{opacity:.4;cursor:not-allowed;}
   .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
@@ -178,6 +179,7 @@
     color:#111;font-size:11px;line-height:1.25;box-shadow:0 1px 3px rgba(0,0,0,.22);
     cursor:grab;touch-action:none;user-select:none;
   }
+  .gantt-v .block.has-toolbar{ padding-top:19px; }
   .gantt-v .block:active{cursor:grabbing;}
   .gantt-v .block b{display:block;font-size:12px;}
   .gantt-v .block.conflict{outline:3px solid var(--danger);outline-offset:-3px;}
@@ -253,6 +255,7 @@
     .gantt-v .block .block-toolbar button{ opacity:1; }
     .gantt-v .block .block-copy-btn{ font-size:11px; padding:3px 7px; }
     .gantt-v .block .block-toolbar button{ width:23px; height:23px; line-height:21px; font-size:13px; }
+    .gantt-v .block.has-toolbar{ padding-top:27px; }
     .onboarding-step, .home-card, nav.tabs button{ min-height:40px; }
   }
   @media (max-width: 900px){
@@ -275,6 +278,15 @@
     table.data{ font-size:11.5px; }
     table.data th, table.data td{ padding:5px; }
     .modal-box{ padding:18px; }
+  }
+  /* iPad縦置き・ミラーリング先モニターなど、幅は十分あるが縦長の画面向け。
+     幅だけで判定する上の2つのブレークポイントだと、縦置きタブレット
+     （だいたい768〜834px幅）は「PC相当」の170px幅レーンのままになり、
+     横スクロールが増えて縦の余白は余る、という組み合わせになりがち。
+     ここでは幅ではなく向き（portrait）で判定し、レーン幅を少し詰めて
+     横スクロールなしで収まる列数を増やす。*/
+  @media (orientation: portrait) and (min-width: 600px){
+    .gantt-v .lane{ flex:0 0 148px; width:148px; }
   }
   .unscheduled-tray{border:1px dashed var(--border);border-radius:8px;padding:8px 10px;margin-bottom:10px;background:var(--panel2);}
   .unscheduled-tray-label{font-size:12px;color:var(--muted);margin-bottom:6px;}
@@ -335,6 +347,7 @@
   </div>
   <div class="row">
     <button class="btn secondary" id="btnShortcutHelp">？ ショートカット</button>
+    <button class="btn secondary" id="btnViewLockToggle" title="オンにすると、タイムテーブルをドラッグで動かせなくなります（確認だけしたいときに便利です）">編集ロック：OFF</button>
     <button class="btn secondary" id="btnAdminToggle">管理者ログイン</button>
     <button class="btn secondary" id="btnBackupExport">バックアップ保存(JSON)</button>
     <label class="btn secondary" style="cursor:pointer;">
@@ -2251,6 +2264,32 @@
   const DRAG_SNAP_MIN = 5;
   const DRAG_MIN_DURATION = 5;
   const DRAG_MAX_MIN = 2875; // ~47:55, matches the app's "翌日" (next-day) time range
+  // Below this many pixels of movement, a pointerdown+pointermove+pointerup
+  // sequence is still treated as a plain tap (falls through to the
+  // click-to-select behavior) rather than a drag. Without this, a light
+  // touch on a phone can jitter by a couple of pixels and accidentally
+  // shift a block's time by one 5-minute snap increment.
+  const DRAG_THRESHOLD_PX = 6;
+
+  // ---------- View-only lock (for checking the schedule on a phone/tablet
+  // without risking an accidental drag) ----------
+  // Persisted so it survives a reload — someone locking their phone to just
+  // look at the schedule at the venue would be annoyed if it silently
+  // unlocked again after backgrounding the browser.
+  const VIEW_LOCK_KEY = "cuefes_view_only_locked";
+  function isViewOnlyLocked(){
+    try{ return localStorage.getItem(VIEW_LOCK_KEY)==="1"; }catch(e){ return false; }
+  }
+  function setViewOnlyLocked(locked){
+    try{ localStorage.setItem(VIEW_LOCK_KEY, locked ? "1" : "0"); }catch(e){ /* ignore */ }
+  }
+  function updateViewLockButton(){
+    const btn = document.getElementById("btnViewLockToggle");
+    if(!btn) return;
+    const locked = isViewOnlyLocked();
+    btn.textContent = locked ? "編集ロック：ON（確認のみ）" : "編集ロック：OFF";
+    btn.classList.toggle("view-lock-active", locked);
+  }
 
   // ---------- Block selection + keyboard shortcuts (Delete/Backspace/Escape/Ctrl+Z) ----------
   // A single selected block at a time, tracked here rather than per-element,
@@ -2347,6 +2386,7 @@
     function onPointerMove(ev){
       if(!dragMode) return;
       const deltaY = (ev.clientY||0) - dragStartY;
+      if(Math.abs(deltaY) < DRAG_THRESHOLD_PX) return;
       const deltaMin = Math.round((deltaY/pxPerMin)/DRAG_SNAP_MIN)*DRAG_SNAP_MIN;
       let newStart = origStartMin, newEnd = origEndMin;
       if(dragMode==="move"){
@@ -2575,6 +2615,7 @@
     function onPointerMove(ev){
       if(!dragMode) return;
       const deltaY = (ev.clientY||0) - dragStartY;
+      if(Math.abs(deltaY) < DRAG_THRESHOLD_PX) return;
       const deltaMin = Math.round((deltaY/pxPerMin)/DRAG_SNAP_MIN)*DRAG_SNAP_MIN;
       let newStart = origStartMin, newEnd = origEndMin;
       if(dragMode==="move"){
@@ -2832,6 +2873,7 @@
           });
           toolbar.appendChild(delBtn);
           block.appendChild(toolbar);
+          block.classList.add("has-toolbar");
         }
         track.appendChild(block);
       });
@@ -2936,7 +2978,7 @@
         <h3 style="margin-top:18px;font-size:14px;">作業一覧（セルを直接編集できます）</h3>
         <div id="staffTable_${day.id}"></div>`;
       wrap.appendChild(section);
-      renderStaffGanttInto(section.querySelector(`#staffGantt_${day.id}`), day.id, {interactive:true});
+      renderStaffGanttInto(section.querySelector(`#staffGantt_${day.id}`), day.id, {interactive: !isViewOnlyLocked()});
       renderStaffTaskTable(section.querySelector(`#staffTable_${day.id}`), day.id);
     });
   }
@@ -3108,6 +3150,7 @@
             });
             toolbar.appendChild(delBtn);
             block.appendChild(toolbar);
+            block.classList.add("has-toolbar");
             if(kind==="live"){
               const copyBtn = document.createElement("button");
               copyBtn.type = "button";
@@ -3269,12 +3312,12 @@
     const wrap = document.getElementById("liveTabWrap");
     wrap.innerHTML = "";
     renderFirstUseHint(wrap);
-    state.days.forEach(day=> renderDaySection(wrap, "live", day));
+    state.days.forEach(day=> renderDaySection(wrap, "live", day, {interactive: !isViewOnlyLocked()}));
   }
   function renderTokutenTab(){
     const wrap = document.getElementById("tokutenTabWrap");
     wrap.innerHTML = "";
-    state.days.forEach(day=> renderDaySection(wrap, "tokuten", day));
+    state.days.forEach(day=> renderDaySection(wrap, "tokuten", day, {interactive: !isViewOnlyLocked()}));
   }
 
   // ---------- Print ----------
@@ -4350,6 +4393,7 @@
     renderContactSheetTab();
     renderStaffTab();
     renderOnboardingChecklist();
+    updateViewLockButton();
     updateClock();
     applyAdminVisibility();
     document.title = (state.event.name?state.event.name+" - ":"")+"CueFes";
@@ -4483,6 +4527,11 @@
   });
   document.getElementById("shortcutHelpModal").addEventListener("click", e=>{
     if(e.target.id === "shortcutHelpModal") document.getElementById("shortcutHelpModal").style.display = "none";
+  });
+  document.getElementById("btnViewLockToggle").addEventListener("click", ()=>{
+    setViewOnlyLocked(!isViewOnlyLocked());
+    updateViewLockButton();
+    renderAll();
   });
   document.getElementById("btnAdminToggle").addEventListener("click", ()=>{
     if(adminUnlocked){
