@@ -515,7 +515,17 @@
           常に新規追加のみ
         </label>
       </div>
-      <div class="row">
+      <div class="grid cols2" style="margin-top:6px;">
+        <div>
+          <label style="font-size:12px;">出力するステージで絞り込む（未選択＝全ステージ）</label>
+          <div id="csvStageChecks" class="chip-list"></div>
+        </div>
+        <div>
+          <label style="font-size:12px;">出力する特典会場で絞り込む（未選択＝全特典会場）</label>
+          <div id="csvTokutenChecks" class="chip-list"></div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:8px;">
         <label class="btn secondary" style="cursor:pointer;">
           CSVを読み込む
           <input type="file" id="fileCsvImport" accept=".csv" style="display:none;">
@@ -533,7 +543,8 @@
         ・動員数（人数）、チケット売上（円）、イベンター好感度（1〜5の数字）は主催者の内部集計用の項目です。空欄で問題ありません。「⑦実績集計」タブで自動集計されます（配布用PDFには出力されません）。<br>
         ・動員数／チケット売上／イベンター好感度は管理者専用の項目です。基本設定で管理者PINを設定している場合、ログインしていない状態ではCSV出力にこれらの列は含まれず、取り込み時もこれらの列は無視されます（他の項目は通常どおり取り込まれます）。<br>
         ・「更新＋追加」モードなら、出演者が決まるたびにCSVに1行ずつ追記して読み込み直すだけでOK。同じDAY・同じアーティスト名の行は上書き更新され、新しい名前の行だけが追加されます（同名重複が発生しません）。<br>
-        ・「常に新規追加のみ」モードは、取り込むたびに必ず新しい行として追加されます（同名でも別データとして扱いたい場合向け）。
+        ・「常に新規追加のみ」モードは、取り込むたびに必ず新しい行として追加されます（同名でも別データとして扱いたい場合向け）。<br>
+        ・出力される行の並び順は、上の一覧表で最後にクリックした列見出し（例：ライブ開始）のソート順と同じになります。並び替えたい場合は、先に一覧表の見出しをクリックしてから出力してください。
       </div>
     </div>
 
@@ -1431,7 +1442,19 @@
     const showAdmin = adminFieldsVisible();
     const headers = showAdmin ? CSV_HEADERS : CSV_HEADERS.slice(0,15);
     const lines = [headers.map(csvField).join(",")];
-    state.artists.forEach(a=>{
+    // Venue filter: an artist with no stage/tokuten assigned at all always
+    // passes that dimension (nothing to filter on); one that does have a
+    // venue must have it checked. Unchecking every box in a dimension hides
+    // everyone who has anything set there — same convention as the ⑥PDF出力
+    // venue checklists.
+    const selectedStages = new Set(Array.from(document.querySelectorAll(".csvStageChk:checked")).map(c=>c.value));
+    const selectedTokuten = new Set(Array.from(document.querySelectorAll(".csvTokutenChk:checked")).map(c=>c.value));
+    const artists = sortedArtistsForDisplay().filter(a=>{
+      const stageOk = !a.stageId || selectedStages.has(a.stageId);
+      const tokutenOk = !a.tokutenSpotId || selectedTokuten.has(a.tokutenSpotId);
+      return stageOk && tokutenOk;
+    });
+    artists.forEach(a=>{
       const row = [
         dayLabel(a.dayId), a.name, stageName(a.stageId), a.liveStart||"", a.liveEnd||"",
         a.durationMin||"", a.changeoverMin||"",
@@ -3344,6 +3367,8 @@
   }
   function renderPrintStageChecks(){ renderPrintLaneChecks("printStageChecks", "printStageChk", state.stages); }
   function renderPrintTokutenChecks(){ renderPrintLaneChecks("printTokutenChecks", "printTokutenChk", state.tokutenSpots); }
+  function renderCsvStageChecks(){ renderPrintLaneChecks("csvStageChecks", "csvStageChk", state.stages); }
+  function renderCsvTokutenChecks(){ renderPrintLaneChecks("csvTokutenChecks", "csvTokutenChk", state.tokutenSpots); }
 
   // Renders the preset chips + individual color pickers in the output tab,
   // and keeps them in sync with state.printStyle (e.g. after a backup import).
@@ -4386,6 +4411,8 @@
     renderPrintDayChecks();
     renderPrintStageChecks();
     renderPrintTokutenChecks();
+    renderCsvStageChecks();
+    renderCsvTokutenChecks();
     renderPrintStyleControls();
     renderStatsTab();
     renderArtistNameList();
