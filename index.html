@@ -664,16 +664,16 @@
         <div><label>アーティスト名 *</label><input type="text" id="afName" list="artistNameList" autocomplete="off" placeholder="入力すると過去の候補が出ます"></div>
         <div><label>ステージ</label><select id="afStage"></select></div>
         <div><label>特典会場</label><select id="afTokuten"></select></div>
-        <div><label>ライブ開始</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afLiveStart"><label class="timefield-late"><input type="checkbox" data-role="afLiveStart_late">翌日</label></span></div>
-        <div><label>ライブ終了</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afLiveEnd"><label class="timefield-late"><input type="checkbox" data-role="afLiveEnd_late">翌日</label></span></div>
-        <div><label>特典会開始</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afTokutenStart"><label class="timefield-late"><input type="checkbox" data-role="afTokutenStart_late">翌日</label></span></div>
-        <div><label>特典会終了</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afTokutenEnd"><label class="timefield-late"><input type="checkbox" data-role="afTokutenEnd_late">翌日</label></span></div>
+        <div><label>ライブ開始</label><span class="timefield"><input type="time" step="300" data-role="afLiveStart"><label class="timefield-late"><input type="checkbox" data-role="afLiveStart_late">翌日</label></span></div>
+        <div><label>ライブ終了</label><span class="timefield"><input type="time" step="300" data-role="afLiveEnd"><label class="timefield-late"><input type="checkbox" data-role="afLiveEnd_late">翌日</label></span></div>
+        <div><label>特典会開始</label><span class="timefield"><input type="time" step="300" data-role="afTokutenStart"><label class="timefield-late"><input type="checkbox" data-role="afTokutenStart_late">翌日</label></span></div>
+        <div><label>特典会終了</label><span class="timefield"><input type="time" step="300" data-role="afTokutenEnd"><label class="timefield-late"><input type="checkbox" data-role="afTokutenEnd_late">翌日</label></span></div>
         <div><label>尺（分）</label><span class="durfield"><input type="number" id="afDuration" min="0" step="5" placeholder="20"><span>分→終了を自動計算</span></span></div>
         <div><label>転換/バッファ（分）</label><span class="durfield"><input type="number" id="afChangeover" min="0" step="5" placeholder="5"><span>分（次の枠まで）</span></span></div>
         <div><label>特典会尺（分）</label><span class="durfield"><input type="number" id="afTokutenDuration" min="0" step="5" placeholder="20"><span>分→特典会終了を自動計算</span></span></div>
         <div><label>移動時間（分）</label><span class="durfield"><input type="number" id="afMoveBuffer" min="0" step="5" placeholder="例：5"><span>ライブ⇔特典会の場所移動に必要な最短時間</span></span></div>
         <div><label>楽屋</label><select id="afGreenRoom"></select></div>
-        <div><label>入り時間</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afCallTime"><label class="timefield-late"><input type="checkbox" data-role="afCallTime_late">翌日</label></span></div>
+        <div><label>入り時間</label><span class="timefield"><input type="time" step="300" data-role="afCallTime"><label class="timefield-late"><input type="checkbox" data-role="afCallTime_late">翌日</label></span></div>
         <div class="admin-field"><label>動員数</label><input type="number" id="afAudience" min="0" step="1" placeholder="人数"></div>
         <div class="admin-field"><label>チケット売上（円）</label><input type="number" id="afTicketSales" min="0" step="100" placeholder="円"></div>
         <div class="admin-field"><label>イベンター好感度</label>
@@ -932,8 +932,8 @@
         <div><label>担当</label><select id="stLane"></select></div>
         <div><label>作業内容</label><input type="text" id="stLabel" placeholder="例：搬入、仕込み、リハーサル"></div>
         <div><label>メモ</label><input type="text" id="stMemo" placeholder="任意"></div>
-        <div><label>開始</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="stStart"><label class="timefield-late"><input type="checkbox" data-role="stStart_late">翌日</label></span></div>
-        <div><label>終了</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="stEnd"><label class="timefield-late"><input type="checkbox" data-role="stEnd_late">翌日</label></span></div>
+        <div><label>開始</label><span class="timefield"><input type="time" step="300" data-role="stStart"><label class="timefield-late"><input type="checkbox" data-role="stStart_late">翌日</label></span></div>
+        <div><label>終了</label><span class="timefield"><input type="time" step="300" data-role="stEnd"><label class="timefield-late"><input type="checkbox" data-role="stEnd_late">翌日</label></span></div>
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn" id="btnAddStaffTask">＋ 作業を追加</button>
@@ -1194,37 +1194,6 @@
     const h = Math.floor(min/60), m = min%60;
     return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
   }
-  // Accepts whatever someone actually types into a time field — "1505",
-  // "705", "15", "15:05", full-width "１５：０５" — and turns it into a clean
-  // "HH:MM" string (00-23 hours; the separate 翌日 checkbox still covers
-  // times past midnight, exactly as before). Returns "" for anything that
-  // doesn't parse as a real time, rather than guessing.
-  function normalizeTypedTime(raw){
-    if(!raw) return "";
-    raw = raw.trim().replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace("：",":");
-    let h, m;
-    if(raw.includes(":")){
-      const parts = raw.split(":");
-      if(parts.length!==2) return "";
-      h = parseInt(parts[0],10); m = parseInt(parts[1],10);
-    } else {
-      const digits = raw.replace(/[^0-9]/g,"");
-      if(digits.length===0) return "";
-      if(digits.length<=2){ h = parseInt(digits,10); m = 0; }
-      else if(digits.length===3){ h = parseInt(digits.slice(0,1),10); m = parseInt(digits.slice(1),10); }
-      else { h = parseInt(digits.slice(0,-2),10); m = parseInt(digits.slice(-2),10); }
-    }
-    if(isNaN(h) || isNaN(m) || h<0 || h>23 || m<0 || m>59) return "";
-    return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
-  }
-  // Delegated so it covers every [data-timeinput] field regardless of which
-  // form/table row it's rendered into, present or future.
-  document.addEventListener("focusout", ev=>{
-    const el = ev.target;
-    if(!el || !el.matches || !el.matches("[data-timeinput]")) return;
-    const normalized = normalizeTypedTime(el.value);
-    el.value = normalized; // clears the field silently if unparseable, same as an empty native time input
-  });
 
   // ---------- "tab-roll" time field (native <input type=time> + 翌日/next-day checkbox) ----------
   // Native time inputs only accept 00:00-23:59, but this app supports times past
@@ -1238,7 +1207,7 @@
       hhmm = minToTime(late ? min-1440 : min);
     }
     return `<span class="timefield">`+
-      `<input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="${role}" value="${escapeAttr(hhmm)}">`+
+      `<input type="time" step="300" data-role="${role}" value="${escapeAttr(hhmm)}">`+
       `<label class="timefield-late" title="24時を超える深夜帯の時刻はチェック（例：翌日 01:30 = 25:30）">`+
         `<input type="checkbox" data-role="${role}_late" ${late?"checked":""}>翌日</label>`+
     `</span>`;
