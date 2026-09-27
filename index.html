@@ -165,6 +165,15 @@
   .status-dot.live{background:var(--danger);}
   .status-dot.upcoming{background:var(--warn);}
   .status-dot.done{background:var(--muted);}
+  .circuit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px;}
+  .circuit-card{border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--panel2);}
+  .circuit-card h4{margin:0 0 8px;font-size:13px;color:var(--muted);}
+  .circuit-card .circuit-now{font-size:15px;font-weight:700;margin-bottom:4px;}
+  .circuit-ontime-badge{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:100px;margin-top:6px;}
+  .circuit-ontime-badge.ok{background:#1c7a4522;color:var(--ok);}
+  .circuit-ontime-badge.late{background:#c81e3922;color:var(--danger);}
+  .circuit-ontime-badge.early{background:#0e6d8c22;color:var(--accent2);}
+  .circuit-ontime-badge.warn{background:#a6650a22;color:var(--warn);cursor:pointer;border:none;font:inherit;}
   .tabcontent{display:none;}
   .tabcontent.active{display:block;}
   #print-area{display:none;}
@@ -331,6 +340,9 @@
     -webkit-print-color-adjust:exact; print-color-adjust:exact; color-adjust:exact;
   }
   .print-output .print-page{ background:var(--print-bg); }
+  .print-list-table{ width:100%; border-collapse:collapse; margin-top:10px; }
+  .print-list-table th, .print-list-table td{ border:1px solid #999; padding:6px 8px; font-size:12px; text-align:left; }
+  .print-list-table th{ background:#eee; }
   .print-output .print-title{ font-size:17px; font-weight:bold; margin-bottom:2px; color:var(--print-title); }
   .print-output .print-sub{ font-size:11px; color:var(--print-sub); margin-bottom:10px; }
   .print-output .gantt-v .lane{ border-left:1px solid var(--print-border); }
@@ -762,6 +774,23 @@
     </div>
 
     <div class="card">
+      <h2>リスト形式で出力（項目の並び替え対応）</h2>
+      <p class="helptext">
+        ステージ別のガント表ではなく、アーティストを1行ずつ並べた表形式で出力します。並び替えの基準を選べるので、「入り時間順に並んだ、楽屋担当向けの一覧」のような用途に向いています。上で選択したDAYが対象になります。
+      </p>
+      <div class="row">
+        <label style="width:auto;">並び替えの基準</label>
+        <select id="printListSortKey" style="width:220px;">
+          <option value="name">アーティスト名</option>
+          <option value="liveStart" selected>時間（ライブ開始）</option>
+          <option value="tokutenSpotId">物販/特典会場</option>
+          <option value="greenRoomId">楽屋</option>
+        </select>
+      </div>
+      <button class="btn secondary" id="btnPrintList" style="font-size:15px;padding:12px 22px;margin-top:10px;">リストをPDFで出力する</button>
+    </div>
+
+    <div class="card">
       <h2>PNG画像として出力</h2>
       <p class="helptext">
         上で選択したDAY・種別ごとに、タイムテーブルを1枚ずつPNG画像として書き出します。「背景を透明にする」を選ぶと、フライヤーのデザインデータ（Photoshopなど）にタイムテーブルを画像として重ねて配置できます。<br>
@@ -930,6 +959,7 @@
       <div id="clockDate" class="helptext" style="font-size:14px;"></div>
     </div>
     <div id="clockDayStatus"></div>
+    <div id="circuitStatusWrap"></div>
   </div>
 
 </main>
@@ -3617,6 +3647,63 @@
     markExportedOnce();
   });
 
+  function buildPrintListArea(){
+    const area = document.getElementById("print-area");
+    area.innerHTML = "";
+    applyPrintStyleVars(area);
+    const selectedDayIds = Array.from(document.querySelectorAll(".printDayChk:checked")).map(c=>c.value);
+    const sortKey = document.getElementById("printListSortKey").value;
+    const evName = state.event.name || "（イベント名未設定）";
+    const evVenue = state.event.venue || "";
+
+    state.days.filter(d=>selectedDayIds.includes(d.id)).forEach(day=>{
+      const p = document.createElement("div");
+      p.className = "print-page";
+      const h = document.createElement("div"); h.className="print-title"; h.textContent = evName+" — 出演者リスト";
+      const sub = document.createElement("div"); sub.className="print-sub"; sub.textContent = [day.label, day.date, evVenue].filter(Boolean).join(" ・ ");
+      p.appendChild(h); p.appendChild(sub);
+
+      let items = state.artists.filter(a=>a.dayId===day.id).map(a=>({
+        a,
+        stageNm: stageName(a.stageId) || "",
+        tokutenNm: tokutenName(a.tokutenSpotId) || "",
+        greenRoomNm: greenRoomName(a.greenRoomId) || "",
+      }));
+      const sortFns = {
+        name: (x,y)=> x.a.name.localeCompare(y.a.name, "ja"),
+        liveStart: (x,y)=> (timeToMin(x.a.liveStart)??99999) - (timeToMin(y.a.liveStart)??99999),
+        tokutenSpotId: (x,y)=> x.tokutenNm.localeCompare(y.tokutenNm, "ja"),
+        greenRoomId: (x,y)=> x.greenRoomNm.localeCompare(y.greenRoomNm, "ja"),
+      };
+      items.sort(sortFns[sortKey] || sortFns.liveStart);
+
+      const table = document.createElement("table");
+      table.className = "print-list-table";
+      table.innerHTML = `<thead><tr><th>アーティスト名</th><th>ステージ</th><th>ライブ時間</th><th>物販/特典会場</th><th>特典会時間</th><th>入り時間</th><th>楽屋</th></tr></thead>`+
+        `<tbody>${items.map(({a,stageNm,tokutenNm,greenRoomNm})=>`<tr>`+
+          `<td>${escapeHtml(a.name)}</td>`+
+          `<td>${escapeHtml(stageNm)}</td>`+
+          `<td>${isValidTime(a.liveStart)&&isValidTime(a.liveEnd) ? escapeHtml(a.liveStart+"〜"+a.liveEnd) : ""}</td>`+
+          `<td>${escapeHtml(tokutenNm)}</td>`+
+          `<td>${isValidTime(a.tokutenStart)&&isValidTime(a.tokutenEnd) ? escapeHtml(a.tokutenStart+"〜"+a.tokutenEnd) : ""}</td>`+
+          `<td>${isValidTime(a.callTime) ? escapeHtml(a.callTime) : ""}</td>`+
+          `<td>${escapeHtml(greenRoomNm)}</td>`+
+        `</tr>`).join("")}</tbody>`;
+      p.appendChild(table);
+      area.appendChild(p);
+    });
+
+    if(area.children.length===0){
+      area.innerHTML = `<div class="print-page"><div class="print-title">出力対象のDAYが選択されていません</div></div>`;
+    }
+  }
+  document.getElementById("btnPrintList").addEventListener("click", ()=>{
+    activePrintBuilder = buildPrintListArea;
+    buildPrintListArea();
+    window.print();
+    markExportedOnce();
+  });
+
   // ---------- PNG image export (for overlaying onto a flyer in image-editing software) ----------
   // window.print() can never produce a transparent background (that's a
   // browser-level constraint of the print pipeline, not something CSS can
@@ -4562,12 +4649,105 @@
     if(nowMin < startMin) return {state:"before", remain:startMin-nowMin};
     return {state:"after", remain:0};
   }
+  // ---------- Circuit status dashboard (⑩現在時刻タブの拡張) ----------
+  // For each stage/tokuten venue, shows who's on now (or coming up next) and
+  // whether they actually started on schedule. "On time" is judged against a
+  // real recorded start time (actualLiveStart/actualTokutenStart), not just
+  // guessed from the clock — nobody but a person at the venue can say
+  // whether a set truly started, so this only ever reports what's been
+  // explicitly logged via the "開始を記録" button below.
+  const ONTIME_GRACE_MIN = 2;
+  function computeLaneNowStatus(items, startKey, endKey, nowMin){
+    const scheduled = items.filter(a=>isValidTime(a[startKey]) && isValidTime(a[endKey]))
+      .map(a=>({ a, s:timeToMin(a[startKey]), e:timeToMin(a[endKey]) }))
+      .sort((x,y)=>x.s-y.s);
+    const current = scheduled.find(x=>nowMin>=x.s && nowMin<x.e);
+    if(current) return { type:"current", entry:current };
+    const next = scheduled.find(x=>x.s>nowMin);
+    if(next) return { type:"next", entry:next };
+    if(scheduled.length>0) return { type:"done" };
+    return { type:"none" };
+  }
+  function renderOntimeBadge(entry, actualKey, nowMin){
+    const actual = entry.a[actualKey];
+    if(isValidTime(actual)){
+      const delay = timeToMin(actual) - entry.s;
+      if(Math.abs(delay)<=ONTIME_GRACE_MIN) return `<span class="circuit-ontime-badge ok">定刻通り</span>`;
+      if(delay>0) return `<span class="circuit-ontime-badge late">${delay}分遅れでスタート</span>`;
+      return `<span class="circuit-ontime-badge early">${Math.abs(delay)}分早くスタート</span>`;
+    }
+    if(nowMin > entry.s + ONTIME_GRACE_MIN){
+      return `<button type="button" class="circuit-ontime-badge warn" data-record-start="${entry.a.id}" data-record-key="${actualKey}">開始未記録（押して記録）</button>`;
+    }
+    return "";
+  }
+  function renderCircuitStatus(now, todays){
+    const wrap = document.getElementById("circuitStatusWrap");
+    if(!wrap) return;
+    wrap.innerHTML = "";
+    if(todays.length===0) return;
+    const nowMin = now.getHours()*60+now.getMinutes();
+    todays.forEach(d=>{
+      const dayArtists = state.artists.filter(a=>a.dayId===d.id);
+      const section = document.createElement("div");
+      section.className = "card";
+      let html = `<h2>${escapeHtml(d.label)}：サーキット進行状況</h2><div class="circuit-grid">`;
+      state.stages.forEach(stage=>{
+        const items = dayArtists.filter(a=>a.stageId===stage.id);
+        const st = computeLaneNowStatus(items, "liveStart", "liveEnd", nowMin);
+        html += `<div class="circuit-card"><h4>${escapeHtml(stage.name)}（ライブ）</h4>`;
+        if(st.type==="current"){
+          html += `<div class="circuit-now">${escapeHtml(st.entry.a.name)}</div>`+
+            `<div class="helptext">${minToTime(st.entry.s)}〜${minToTime(st.entry.e)}</div>`+
+            renderOntimeBadge(st.entry, "actualLiveStart", nowMin);
+        } else if(st.type==="next"){
+          html += `<div class="helptext">次：${escapeHtml(st.entry.a.name)}（${minToTime(st.entry.s)}〜、あと${fmtRemain(st.entry.s-nowMin)}）</div>`;
+        } else if(st.type==="done"){
+          html += `<div class="helptext">本日のライブは終了しました</div>`;
+        } else {
+          html += `<div class="helptext">出演予定なし</div>`;
+        }
+        html += `</div>`;
+      });
+      state.tokutenSpots.forEach(spot=>{
+        const items = dayArtists.filter(a=>a.tokutenSpotId===spot.id);
+        const st = computeLaneNowStatus(items, "tokutenStart", "tokutenEnd", nowMin);
+        html += `<div class="circuit-card"><h4>${escapeHtml(spot.name)}（特典会）</h4>`;
+        if(st.type==="current"){
+          html += `<div class="circuit-now">${escapeHtml(st.entry.a.name)}</div>`+
+            `<div class="helptext">${minToTime(st.entry.s)}〜${minToTime(st.entry.e)}</div>`+
+            renderOntimeBadge(st.entry, "actualTokutenStart", nowMin);
+        } else if(st.type==="next"){
+          html += `<div class="helptext">次：${escapeHtml(st.entry.a.name)}（${minToTime(st.entry.s)}〜、あと${fmtRemain(st.entry.s-nowMin)}）</div>`;
+        } else if(st.type==="done"){
+          html += `<div class="helptext">本日の特典会は終了しました</div>`;
+        } else {
+          html += `<div class="helptext">出演予定なし</div>`;
+        }
+        html += `</div>`;
+      });
+      html += `</div>`;
+      section.innerHTML = html;
+      wrap.appendChild(section);
+    });
+    wrap.querySelectorAll("[data-record-start]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const a = byId(state.artists, btn.dataset.recordStart);
+        if(!a) return;
+        const nowStr = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+        a[btn.dataset.recordKey] = nowStr;
+        saveState();
+        renderCircuitStatus(new Date(), todays);
+      });
+    });
+  }
   function renderClockDayStatus(now){
     const wrap = document.getElementById("clockDayStatus");
     if(!wrap) return;
     const todayStr = toISODate(now);
     const nowMin = now.getHours()*60+now.getMinutes();
     const todays = state.days.filter(d=>d.date===todayStr);
+    renderCircuitStatus(now, todays);
     wrap.innerHTML = "";
     if(todays.length===0){
       const upcoming = state.days.filter(d=>d.date && d.date>=todayStr).sort((a,b)=> a.date<b.date?-1:1)[0];
