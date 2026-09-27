@@ -166,6 +166,8 @@
   .status-dot.upcoming{background:var(--warn);}
   .status-dot.done{background:var(--muted);}
   .circuit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;margin-top:14px;}
+  .circuit-summary{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;}
+  .circuit-summary-item{display:flex;align-items:center;gap:8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:13px;}
   .circuit-card{border:1px solid var(--border);border-radius:10px;padding:14px;background:var(--panel2);}
   .circuit-card h4{margin:0 0 8px;font-size:13px;color:var(--muted);}
   .circuit-card .circuit-now{font-size:15px;font-weight:700;margin-bottom:4px;}
@@ -4637,6 +4639,33 @@
     if(scheduled.length>0) return { type:"done" };
     return { type:"none" };
   }
+  // What we currently KNOW about how a lane is running: the most recently
+  // *recorded* start (scheduled time <= now, actual start logged), whichever
+  // artist that was. Unlike computeLaneNowStatus's "current artist", this
+  // deliberately keeps showing that reading after their set ends — a lane
+  // that ran 10 minutes late doesn't become "fine" again the moment the
+  // delayed artist finishes; the delay is still there until someone logs a
+  // newer start that says otherwise.
+  function computeLaneDelayInfo(items, startKey, endKey, actualKey, nowMin){
+    const scheduled = items.filter(a=>isValidTime(a[startKey]) && isValidTime(a[endKey]))
+      .map(a=>({ a, s:timeToMin(a[startKey]), e:timeToMin(a[endKey]) }))
+      .sort((x,y)=>x.s-y.s);
+    const recorded = scheduled.filter(x=>x.s<=nowMin && isValidTime(x.a[actualKey]));
+    const last = recorded[recorded.length-1];
+    if(!last) return null;
+    return { artist:last.a, delay: timeToMin(last.a[actualKey]) - last.s };
+  }
+  function delaySummaryHtml(laneName, info){
+    if(!info){
+      return `<div class="circuit-summary-item"><b>${escapeHtml(laneName)}</b><span class="circuit-ontime-badge" style="background:var(--panel2);color:var(--muted);">未記録</span></div>`;
+    }
+    let cls, label;
+    if(Math.abs(info.delay)<=ONTIME_GRACE_MIN){ cls="ok"; label="定刻通り"; }
+    else if(info.delay>0){ cls="late"; label=info.delay+"分遅れ"; }
+    else { cls="early"; label=Math.abs(info.delay)+"分早い"; }
+    return `<div class="circuit-summary-item"><b>${escapeHtml(laneName)}</b><span class="circuit-ontime-badge ${cls}">${label}</span>`+
+      `<span class="helptext" style="margin-left:6px;">（${escapeHtml(info.artist.name)} 時点）</span></div>`;
+  }
   function renderOntimeBadge(entry, actualKey, nowMin){
     const actual = entry.a[actualKey];
     if(isValidTime(actual)){
@@ -4660,7 +4689,24 @@
       const dayArtists = state.artists.filter(a=>a.dayId===d.id);
       const section = document.createElement("div");
       section.className = "card";
-      let html = `<h2>${escapeHtml(d.label)}：サーキット進行状況</h2><div class="circuit-grid">`;
+      let html = `<h2>${escapeHtml(d.label)}：サーキット進行状況</h2>`;
+
+      // ---- Summary: at-a-glance delay status for every lane ----
+      html += `<div class="circuit-summary">`;
+      state.stages.forEach(stage=>{
+        const items = dayArtists.filter(a=>a.stageId===stage.id);
+        const info = computeLaneDelayInfo(items, "liveStart", "liveEnd", "actualLiveStart", nowMin);
+        html += delaySummaryHtml(stage.name+"（ライブ）", info);
+      });
+      state.tokutenSpots.forEach(spot=>{
+        const items = dayArtists.filter(a=>a.tokutenSpotId===spot.id);
+        const info = computeLaneDelayInfo(items, "tokutenStart", "tokutenEnd", "actualTokutenStart", nowMin);
+        html += delaySummaryHtml(spot.name+"（特典会）", info);
+      });
+      html += `</div>`;
+
+      // ---- Detail cards: who's on now / next, per lane ----
+      html += `<div class="circuit-grid">`;
       state.stages.forEach(stage=>{
         const items = dayArtists.filter(a=>a.stageId===stage.id);
         const st = computeLaneNowStatus(items, "liveStart", "liveEnd", nowMin);
