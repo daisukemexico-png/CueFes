@@ -176,6 +176,10 @@
   .circuit-ontime-badge.late{background:#c81e3922;color:var(--danger);}
   .circuit-ontime-badge.early{background:#0e6d8c22;color:var(--accent2);}
   .circuit-ontime-badge.warn{background:#a6650a22;color:var(--warn);cursor:pointer;border:none;font:inherit;}
+  .circuit-delay-input-row{display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap;}
+  .circuit-delay-input-row .helptext{margin:0;}
+  .circuit-delay-input{padding:3px 6px;font-size:12px;}
+  .circuit-edit-delay-btn{background:none;border:none;color:var(--accent2);font-size:11px;cursor:pointer;padding:0;text-decoration:underline;}
   .tabcontent{display:none;}
   .tabcontent.active{display:block;}
   #print-area{display:none;}
@@ -4670,12 +4674,18 @@
     const actual = entry.a[actualKey];
     if(isValidTime(actual)){
       const delay = timeToMin(actual) - entry.s;
-      if(Math.abs(delay)<=ONTIME_GRACE_MIN) return `<span class="circuit-ontime-badge ok">定刻通り</span>`;
-      if(delay>0) return `<span class="circuit-ontime-badge late">${delay}分遅れでスタート</span>`;
-      return `<span class="circuit-ontime-badge early">${Math.abs(delay)}分早くスタート</span>`;
+      let label;
+      if(Math.abs(delay)<=ONTIME_GRACE_MIN) label = `<span class="circuit-ontime-badge ok">定刻通り</span>`;
+      else if(delay>0) label = `<span class="circuit-ontime-badge late">${delay}分遅れでスタート</span>`;
+      else label = `<span class="circuit-ontime-badge early">${Math.abs(delay)}分早くスタート</span>`;
+      return label+` <button type="button" class="circuit-edit-delay-btn" data-edit-delay="${entry.a.id}" data-edit-key="${actualKey}" title="記録した分数を修正する">修正</button>`;
     }
     if(nowMin > entry.s + ONTIME_GRACE_MIN){
-      return `<button type="button" class="circuit-ontime-badge warn" data-record-start="${entry.a.id}" data-record-key="${actualKey}">開始未記録（押して記録）</button>`;
+      return `<div class="circuit-delay-input-row">`+
+        `<span class="helptext">何分遅れでスタートしましたか？</span>`+
+        `<input type="number" step="1" class="circuit-delay-input" data-delay-for="${entry.a.id}" placeholder="例：8" style="width:60px;">分`+
+        `<button type="button" class="btn secondary" data-record-start="${entry.a.id}" data-record-key="${actualKey}" data-record-scheduled="${entry.s}" style="padding:3px 10px;font-size:12px;">記録</button>`+
+      `</div>`;
     }
     return "";
   }
@@ -4749,8 +4759,20 @@
       btn.addEventListener("click", ()=>{
         const a = byId(state.artists, btn.dataset.recordStart);
         if(!a) return;
-        const nowStr = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
-        a[btn.dataset.recordKey] = nowStr;
+        const input = wrap.querySelector(`.circuit-delay-input[data-delay-for="${btn.dataset.recordStart}"]`);
+        const delayMin = input && input.value.trim()!=="" ? parseInt(input.value, 10) : 0;
+        if(isNaN(delayMin)){ alert("分数は数字で入力してください。"); return; }
+        const scheduled = parseInt(btn.dataset.recordScheduled, 10);
+        a[btn.dataset.recordKey] = minToTime(((scheduled+delayMin)%1440+1440)%1440);
+        saveState();
+        renderCircuitStatus(new Date(), todays);
+      });
+    });
+    wrap.querySelectorAll("[data-edit-delay]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const a = byId(state.artists, btn.dataset.editDelay);
+        if(!a) return;
+        a[btn.dataset.editKey] = ""; // clear the recorded start so the minutes-input prompt reappears
         saveState();
         renderCircuitStatus(new Date(), todays);
       });
