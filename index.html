@@ -158,6 +158,11 @@
   .daycard{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:13px;}
   .timefield{display:inline-flex;align-items:center;gap:6px;flex-wrap:nowrap;}
   .timefield input[type=time]{width:auto;min-width:108px;}
+  .timefield input[data-timeinput]{width:78px;}
+  .timefield-picker-btn{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);cursor:pointer;padding:4px 5px;display:inline-flex;align-items:center;}
+  .timefield-picker-btn:hover{color:var(--accent2);border-color:var(--accent2);}
+  .timefield-picker-popover{position:absolute;z-index:400;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px 10px;box-shadow:var(--shadow-md);white-space:nowrap;}
+  .timefield-picker-popover select{width:auto;padding:3px 4px;font-size:13px;}
   .timefield-late{display:flex;align-items:center;gap:3px;font-size:10px;color:var(--muted);white-space:nowrap;cursor:pointer;margin:0;}
   .timefield-late input[type=checkbox]{width:auto;margin:0;}
   .helptext{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.65;}
@@ -670,16 +675,16 @@
         <div><label>アーティスト名 *</label><input type="text" id="afName" list="artistNameList" autocomplete="off" placeholder="入力すると過去の候補が出ます"></div>
         <div><label>ステージ</label><select id="afStage"></select></div>
         <div><label>特典会場</label><select id="afTokuten"></select></div>
-        <div><label>ライブ開始</label><span class="timefield"><input type="time" step="300" data-role="afLiveStart"><label class="timefield-late"><input type="checkbox" data-role="afLiveStart_late">翌日</label></span></div>
-        <div><label>ライブ終了</label><span class="timefield"><input type="time" step="300" data-role="afLiveEnd"><label class="timefield-late"><input type="checkbox" data-role="afLiveEnd_late">翌日</label></span></div>
-        <div><label>特典会開始</label><span class="timefield"><input type="time" step="300" data-role="afTokutenStart"><label class="timefield-late"><input type="checkbox" data-role="afTokutenStart_late">翌日</label></span></div>
-        <div><label>特典会終了</label><span class="timefield"><input type="time" step="300" data-role="afTokutenEnd"><label class="timefield-late"><input type="checkbox" data-role="afTokutenEnd_late">翌日</label></span></div>
+        <div><label>ライブ開始</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afLiveStart"><button type="button" class="timefield-picker-btn" data-picker-for="afLiveStart" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="afLiveStart_late">翌日</label></span></div>
+        <div><label>ライブ終了</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afLiveEnd"><button type="button" class="timefield-picker-btn" data-picker-for="afLiveEnd" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="afLiveEnd_late">翌日</label></span></div>
+        <div><label>特典会開始</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afTokutenStart"><button type="button" class="timefield-picker-btn" data-picker-for="afTokutenStart" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="afTokutenStart_late">翌日</label></span></div>
+        <div><label>特典会終了</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afTokutenEnd"><button type="button" class="timefield-picker-btn" data-picker-for="afTokutenEnd" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="afTokutenEnd_late">翌日</label></span></div>
         <div><label>尺（分）</label><span class="durfield"><input type="number" id="afDuration" min="0" step="5" placeholder="20"><span>分→終了を自動計算</span></span></div>
         <div><label>転換/バッファ（分）</label><span class="durfield"><input type="number" id="afChangeover" min="0" step="5" placeholder="5"><span>分（次の枠まで）</span></span></div>
         <div><label>特典会尺（分）</label><span class="durfield"><input type="number" id="afTokutenDuration" min="0" step="5" placeholder="20"><span>分→特典会終了を自動計算</span></span></div>
         <div><label>移動時間（分）</label><span class="durfield"><input type="number" id="afMoveBuffer" min="0" step="5" placeholder="例：5"><span>ライブ⇔特典会の場所移動に必要な最短時間</span></span></div>
         <div><label>楽屋</label><select id="afGreenRoom"></select></div>
-        <div><label>入り時間</label><span class="timefield"><input type="time" step="300" data-role="afCallTime"><label class="timefield-late"><input type="checkbox" data-role="afCallTime_late">翌日</label></span></div>
+        <div><label>入り時間</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="afCallTime"><button type="button" class="timefield-picker-btn" data-picker-for="afCallTime" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="afCallTime_late">翌日</label></span></div>
         <div class="admin-field"><label>動員数</label><input type="number" id="afAudience" min="0" step="1" placeholder="人数"></div>
         <div class="admin-field"><label>チケット売上（円）</label><input type="number" id="afTicketSales" min="0" step="100" placeholder="円"></div>
         <div class="admin-field"><label>イベンター好感度</label>
@@ -938,8 +943,8 @@
         <div><label>担当</label><select id="stLane"></select></div>
         <div><label>作業内容</label><input type="text" id="stLabel" placeholder="例：搬入、仕込み、リハーサル"></div>
         <div><label>メモ</label><input type="text" id="stMemo" placeholder="任意"></div>
-        <div><label>開始</label><span class="timefield"><input type="time" step="300" data-role="stStart"><label class="timefield-late"><input type="checkbox" data-role="stStart_late">翌日</label></span></div>
-        <div><label>終了</label><span class="timefield"><input type="time" step="300" data-role="stEnd"><label class="timefield-late"><input type="checkbox" data-role="stEnd_late">翌日</label></span></div>
+        <div><label>開始</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="stStart"><button type="button" class="timefield-picker-btn" data-picker-for="stStart" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="stStart_late">翌日</label></span></div>
+        <div><label>終了</label><span class="timefield"><input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="stEnd"><button type="button" class="timefield-picker-btn" data-picker-for="stEnd" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button><label class="timefield-late"><input type="checkbox" data-role="stEnd_late">翌日</label></span></div>
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn" id="btnAddStaffTask">＋ 作業を追加</button>
@@ -1200,6 +1205,85 @@
     const h = Math.floor(min/60), m = min%60;
     return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
   }
+  // Accepts whatever someone actually types into a time field — "1505",
+  // "705", "15", "15:05", full-width "１５：０５" — and turns it into a clean
+  // "HH:MM" string (00-23 hours; the separate 翌日 checkbox still covers
+  // times past midnight, exactly as before). Returns "" for anything that
+  // doesn't parse as a real time, rather than guessing. Native
+  // <input type="time"> was tried and reverted twice: Chrome's own minute
+  // segment can commit two fast keystrokes in the wrong order (typing "30"
+  // sometimes lands as "03") — a browser-level quirk with no JS-side fix,
+  // which is why typed input is handled this way instead.
+  function normalizeTypedTime(raw){
+    if(!raw) return "";
+    raw = raw.trim().replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace("：",":");
+    let h, m;
+    if(raw.includes(":")){
+      const parts = raw.split(":");
+      if(parts.length!==2) return "";
+      h = parseInt(parts[0],10); m = parseInt(parts[1],10);
+    } else {
+      const digits = raw.replace(/[^0-9]/g,"");
+      if(digits.length===0) return "";
+      if(digits.length<=2){ h = parseInt(digits,10); m = 0; }
+      else if(digits.length===3){ h = parseInt(digits.slice(0,1),10); m = parseInt(digits.slice(1),10); }
+      else { h = parseInt(digits.slice(0,-2),10); m = parseInt(digits.slice(-2),10); }
+    }
+    if(isNaN(h) || isNaN(m) || h<0 || h>23 || m<0 || m>59) return "";
+    return String(h).padStart(2,"0")+":"+String(m).padStart(2,"0");
+  }
+  // Delegated so it covers every [data-timeinput] field regardless of which
+  // form/table row it's rendered into, present or future.
+  document.addEventListener("focusout", ev=>{
+    const el = ev.target;
+    if(!el || !el.matches || !el.matches("[data-timeinput]")) return;
+    el.value = normalizeTypedTime(el.value); // clears the field silently if unparseable, same as an empty native time input
+  });
+
+  // ---------- Custom clock picker popover (mouse-friendly alternative to typing) ----------
+  // A small popover with hour/minute <select> dropdowns, opened by the clock
+  // icon next to each time field. <select> elements have none of the native
+  // time input's fast-typing quirk, since picking is just a discrete list
+  // choice — this is what gives back the "point and click a time" feel
+  // without reintroducing the typing bug.
+  let openPickerPopover = null;
+  function closeTimePickerPopover(){
+    if(openPickerPopover){ openPickerPopover.remove(); openPickerPopover = null; }
+  }
+  document.addEventListener("click", ev=>{
+    const btn = ev.target.closest(".timefield-picker-btn");
+    if(!btn){
+      if(openPickerPopover && !ev.target.closest(".timefield-picker-popover")) closeTimePickerPopover();
+      return;
+    }
+    ev.preventDefault();
+    const wasOpenForThisBtn = openPickerPopover && openPickerPopover._btnRef===btn;
+    closeTimePickerPopover();
+    if(wasOpenForThisBtn) return; // second click on the same button just closes it
+    const input = btn.previousElementSibling;
+    if(!input || !input.matches("[data-timeinput]")) return;
+    const cur = normalizeTypedTime(input.value);
+    const [curH, curM] = cur ? cur.split(":").map(Number) : [0,0];
+    const pop = document.createElement("div");
+    pop.className = "timefield-picker-popover";
+    pop._btnRef = btn;
+    const hourOpts = Array.from({length:24}, (_,h)=>`<option value="${h}" ${h===curH?"selected":""}>${String(h).padStart(2,"0")}</option>`).join("");
+    const minOpts = Array.from({length:12}, (_,i)=>i*5).map(m=>`<option value="${m}" ${m===Math.round(curM/5)*5?"selected":""}>${String(m).padStart(2,"0")}</option>`).join("");
+    pop.innerHTML = `<select class="tp-hour">${hourOpts}</select> : <select class="tp-min">${minOpts}</select>`+
+      `<button type="button" class="btn secondary tp-apply" style="margin-left:8px;padding:3px 10px;font-size:12px;">決定</button>`;
+    document.body.appendChild(pop);
+    const rect = btn.getBoundingClientRect();
+    pop.style.position = "absolute";
+    pop.style.left = (window.scrollX+rect.left)+"px";
+    pop.style.top = (window.scrollY+rect.bottom+4)+"px";
+    pop.querySelector(".tp-apply").addEventListener("click", ()=>{
+      const h = pop.querySelector(".tp-hour").value.padStart(2,"0");
+      const m = pop.querySelector(".tp-min").value.padStart(2,"0");
+      input.value = h+":"+m;
+      closeTimePickerPopover();
+    });
+    openPickerPopover = pop;
+  });
 
   // ---------- "tab-roll" time field (native <input type=time> + 翌日/next-day checkbox) ----------
   // Native time inputs only accept 00:00-23:59, but this app supports times past
@@ -1213,7 +1297,7 @@
       hhmm = minToTime(late ? min-1440 : min);
     }
     return `<span class="timefield">`+
-      `<input type="time" step="300" data-role="${role}" value="${escapeAttr(hhmm)}">`+
+      `<input type="text" inputmode="numeric" placeholder="15:05" data-timeinput data-role="${role}" value="${escapeAttr(hhmm)}"><button type="button" class="timefield-picker-btn" data-picker-for="${role}" title="時計から選ぶ"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>`+
       `<label class="timefield-late" title="24時を超える深夜帯の時刻はチェック（例：翌日 01:30 = 25:30）">`+
         `<input type="checkbox" data-role="${role}_late" ${late?"checked":""}>翌日</label>`+
     `</span>`;
