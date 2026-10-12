@@ -382,6 +382,10 @@
     </div>
   </div>
   <div class="row">
+    <button class="btn secondary" id="btnAppInfo" title="バージョン情報" style="display:inline-flex;align-items:center;gap:5px;">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      環境設定
+    </button>
     <button class="btn secondary" id="btnShortcutHelp">？ ショートカット</button>
     <button class="btn secondary" id="btnViewLockToggle" title="オンにすると、タイムテーブルをドラッグで動かせなくなります（確認だけしたいときに便利です）">編集ロック：OFF</button>
     <button class="btn secondary" id="btnAdminToggle">管理者ログイン</button>
@@ -400,6 +404,23 @@
     <button type="button" id="adpClose" title="閉じる">✕</button>
   </div>
   <div class="artist-detail-body" id="adpBody"></div>
+</div>
+
+<div class="modal-overlay" id="appInfoModal">
+  <div class="modal-box" style="max-width:420px;">
+    <h3 style="display:flex;align-items:center;gap:10px;">
+      <img src="data:image/png;base64,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" alt="" style="height:26px;width:auto;">
+      バージョン情報
+    </h3>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+      <div><span class="helptext" style="margin:0;">バージョン</span><div style="font-size:18px;font-weight:700;">v<span id="appInfoVersion"></span></div></div>
+      <div><span class="helptext" style="margin:0;">最終更新日</span><div id="appInfoDate"></div></div>
+      <p class="helptext" style="margin-top:4px;">動作がおかしい場合は、一度「全データ削除」ではなく、ブラウザの再読み込み（リロード）をお試しください（データは消えません）。</p>
+    </div>
+    <div class="row" style="margin-top:16px;justify-content:flex-end;">
+      <button class="btn" id="appInfoModalClose">閉じる</button>
+    </div>
+  </div>
 </div>
 
 <div class="modal-overlay" id="shortcutHelpModal">
@@ -985,6 +1006,11 @@
 (function(){
   "use strict";
 
+  // Date-based version string, bumped whenever a meaningful update is
+  // pushed to production — simplest thing that's self-documenting without
+  // needing a separate changelog to stay in sync with.
+  const APP_VERSION = "2026.09.27";
+  const APP_UPDATED_DATE = "2026年9月27日";
   const STORAGE_KEY = "idolfes_timetable_v2";
   const STORAGE_KEY_V1 = "idolfes_timetable_v1";
   const ARTIST_HISTORY_KEY = "cuefes_artist_history_v1";
@@ -4955,6 +4981,17 @@
     document.getElementById("adminModal").style.display = "none";
   }
   document.getElementById("adpClose").addEventListener("click", clearBlockSelection);
+  document.getElementById("btnAppInfo").addEventListener("click", ()=>{
+    document.getElementById("appInfoVersion").textContent = APP_VERSION;
+    document.getElementById("appInfoDate").textContent = APP_UPDATED_DATE;
+    document.getElementById("appInfoModal").style.display = "flex";
+  });
+  document.getElementById("appInfoModalClose").addEventListener("click", ()=>{
+    document.getElementById("appInfoModal").style.display = "none";
+  });
+  document.getElementById("appInfoModal").addEventListener("click", e=>{
+    if(e.target.id === "appInfoModal") document.getElementById("appInfoModal").style.display = "none";
+  });
   document.getElementById("btnShortcutHelp").addEventListener("click", ()=>{
     document.getElementById("shortcutHelpModal").style.display = "flex";
   });
